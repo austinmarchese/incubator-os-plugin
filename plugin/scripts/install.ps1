@@ -201,12 +201,17 @@ set /p TOKEN=<"%USERPROFILE%\.incubator-os\token"
 echo password=%TOKEN%
 "@ | Set-Content -Path $HelperPath -Encoding ASCII
 
-# Reset the helper chain for this URL scope so Git Credential Manager
-# (bundled with Git for Windows) doesn't intercept with a GitHub login popup.
-# `helper = ""` clears inherited helpers for the URL; the second add registers ours.
-git config --global --unset-all "credential.https://github.com/austinmarchese.helper" 2>$null
-git config --global --add "credential.https://github.com/austinmarchese.helper" ""
-git config --global --add "credential.https://github.com/austinmarchese.helper" "`"$HelperPath`""
+# Git on Windows runs credential helpers via msys sh, which mangles
+# backslashes. Use forward slashes when storing the path in git config
+# so sh resolves it as a real file instead of a stripped string.
+# Then --replace-all so reruns don't accumulate duplicate entries.
+# (We skip the `helper = ""` chain-reset trick: PowerShell drops empty
+# string args when invoking native exes, which would leave the config
+# in a broken state. Instead, we rely on git's behavior of stopping at
+# the first helper that returns valid credentials — when ours works,
+# GCM is never queried and the popup never appears.)
+$HelperPathGit = $HelperPath -replace '\\', '/'
+git config --global --replace-all "credential.https://github.com/austinmarchese.helper" $HelperPathGit
 
 # ── Clone repo ─────────────────────────────────────────────────────
 New-Item -ItemType Directory -Force -Path $WorkspaceBase | Out-Null
