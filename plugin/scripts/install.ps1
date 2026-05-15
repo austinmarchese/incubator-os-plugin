@@ -192,24 +192,26 @@ icacls $AuthFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 icacls $TokenFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 
 # ── URL-scoped credential helper ───────────────────────────────────
-$HelperPath = Join-Path $IncOsDir "credential-helper.cmd"
-@"
-@echo off
-if /I "%~1" NEQ "get" exit /b 0
-echo username=austinmarchese
-set /p TOKEN=<"%USERPROFILE%\.incubator-os\token"
-echo password=%TOKEN%
-"@ | Set-Content -Path $HelperPath -Encoding ASCII
+# Git on Windows runs credential helpers via the bundled msys/MinGW
+# sh.exe. A .cmd helper doesn't execute cleanly under that shell
+# (silently returns no output), so git falls back to Git Credential
+# Manager and pops a "Connect to GitHub" dialog. A POSIX sh script
+# does run cleanly, since Git for Windows ships with bash.
+$HelperPath = Join-Path $IncOsDir "credential-helper.sh"
+$TokenPathSh = ($TokenFile -replace '\\', '/')
+$helperBody = @"
+#!/bin/sh
+[ "`$1" = "get" ] || exit 0
+echo "username=austinmarchese"
+echo "password=`$(cat "$TokenPathSh")"
+"@
+# Write as ASCII with LF line endings so msys sh parses it.
+$helperBodyLf = $helperBody -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText($HelperPath, $helperBodyLf, [System.Text.UTF8Encoding]::new($false))
 
-# Git on Windows runs credential helpers via msys sh, which mangles
-# backslashes. Use forward slashes when storing the path in git config
-# so sh resolves it as a real file instead of a stripped string.
-# Then --replace-all so reruns don't accumulate duplicate entries.
-# (We skip the `helper = ""` chain-reset trick: PowerShell drops empty
-# string args when invoking native exes, which would leave the config
-# in a broken state. Instead, we rely on git's behavior of stopping at
-# the first helper that returns valid credentials — when ours works,
-# GCM is never queried and the popup never appears.)
+# Forward-slash absolute path so git's sh resolves it correctly.
+# --replace-all collapses any prior entries from earlier installer
+# versions (e.g. broken .cmd path) so we don't fall back to GCM.
 $HelperPathGit = $HelperPath -replace '\\', '/'
 git config --global --replace-all "credential.https://github.com/austinmarchese.helper" $HelperPathGit
 
