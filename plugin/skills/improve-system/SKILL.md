@@ -1,6 +1,6 @@
 ---
-name: inc-os:improve
-description: "Make your system smarter. Improves skills from iteration, captures experiences, reviews session history for knowledge, audits for rot, and sets up foundation content. Routes automatically based on context."
+name: inc-os:improve-system
+description: "Improve your system. Improves skills from iteration, captures experiences, reviews session history for knowledge, audits for rot, and sets up foundation content. Routes automatically based on context."
 ---
 
 # /inc-os:improve

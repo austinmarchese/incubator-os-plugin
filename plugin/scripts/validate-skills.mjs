@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.join(__dirname, "..", "skills");
 
 // Mirror of INC_OS_SKILL_NAMES from src/lib/inc-os-skills.ts
-const ALLOWED = new Set(["inc-os:update", "inc-os:save", "inc-os:improve", "inc-os:ingest"]);
+const ALLOWED = new Set(["inc-os:update", "inc-os:save", "inc-os:improve-system", "inc-os:ingest"]);
 
 const errors = [];
 const seenNames = new Set();

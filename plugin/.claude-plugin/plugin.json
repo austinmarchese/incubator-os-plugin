@@ -32,7 +32,7 @@
           },
           {
             "type": "command",
-            "command": "day=$(date +%u); if [ \"$day\" = \"2\" ] || [ \"$day\" = \"5\" ]; then printf '{\"systemMessage\":\"Run /inc-os:improve to review your sessions.\"}'; fi",
+            "command": "day=$(date +%u); if [ \"$day\" = \"2\" ] || [ \"$day\" = \"5\" ]; then printf '{\"systemMessage\":\"Run /inc-os:improve-system to review your sessions.\"}'; fi",
             "timeout": 5
           }
         ]

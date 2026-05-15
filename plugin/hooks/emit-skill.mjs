@@ -4,7 +4,7 @@ import { SPOOL_FILE, ensureDir, debug, getSessionId } from "./_util.mjs";
 const ALLOWED = new Set([
   "inc-os:update",
   "inc-os:save",
-  "inc-os:improve",
+  "inc-os:improve-system",
   "inc-os:ingest",
 ]);
 

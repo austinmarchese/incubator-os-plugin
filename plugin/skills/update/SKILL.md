@@ -93,7 +93,7 @@ SETTINGS
 
 What this means for you:
   <1-3 sentences on what's worth knowing. e.g., "Use /inc-os:new-skill-name
-  instead of manually doing X", or "The /inc-os:improve skill now
+  instead of manually doing X", or "The /inc-os:improve-system skill now
   auto-discovers any advisor file added under wiki/consultants/.">
 
 ```
@@ -113,7 +113,7 @@ Only flag if there's a real issue. Otherwise end with the briefing.
 - Does not push local commits. That's the user's call.
 - Does not resolve merge conflicts automatically.
 - Does not modify local settings (`settings.local.json` stays personal).
-- Does not run `/inc-os:improve` or any other skill as a side effect.
+- Does not run `/inc-os:improve-system` or any other skill as a side effect.
 
 ## Common edge cases
 
