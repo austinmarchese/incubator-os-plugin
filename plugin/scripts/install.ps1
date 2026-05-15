@@ -14,6 +14,12 @@ $WorkspaceBase = Join-Path $HOME "incubator"
 $Failures = @()
 function Track-Failure { param([string]$msg) $script:Failures += $msg }
 
+# Refresh $env:Path from registry so newly-installed CLIs (npm, node, claude)
+# are visible in the current PS session without a shell restart.
+function Refresh-Path {
+  $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+
 Write-Host ""
 Write-Host "  Incubator OS Plugin Installer" -ForegroundColor White
 Write-Host ""
@@ -38,11 +44,16 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 }
 
 # ── Install winget-managed deps if missing ─────────────────────────
+# Pick up any PATH changes from previous installs (winget updates the
+# registry but the current PS process keeps a stale copy of $env:Path).
+Refresh-Path
+
 function Ensure-Cmd {
   param([string]$Cmd, [string]$WingetId)
   if (-not (Get-Command $Cmd -ErrorAction SilentlyContinue)) {
     Write-Host "  Installing $Cmd..."
     winget install --id $WingetId --accept-source-agreements --accept-package-agreements --silent
+    Refresh-Path
   }
 }
 
@@ -101,9 +112,16 @@ if ($PyCmd) {
   Track-Failure "python (optional, YouTube ingest)"
 }
 
+Refresh-Path
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Write-Host "  Installing Claude Code..."
-  npm install -g @anthropic-ai/claude-code
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Write-Host "  npm is not on PATH yet. Open a new PowerShell window and rerun the install command." -ForegroundColor Red
+    Track-Failure "Claude Code (npm not on PATH - rerun in a new shell)"
+  } else {
+    npm install -g @anthropic-ai/claude-code
+    Refresh-Path
+  }
 }
 
 # ── Install Claude Desktop (best-effort, non-fatal) ────────────────
@@ -210,15 +228,26 @@ $Shortcut.Save()
 # ── Install plugin ─────────────────────────────────────────────────
 Write-Host "  Installing the Incubator OS plugin..."
 
-claude plugin marketplace remove incubator-os 2>$null
-claude plugin marketplace add austinmarchese/incubator-os-plugin
-claude plugin install "inc-os@incubator-os"
+Refresh-Path
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+  Write-Host "  ! claude CLI not on PATH - open a new PowerShell window and rerun this install command." -ForegroundColor Red
+  Track-Failure "Plugin install skipped - claude CLI not on PATH yet (rerun in a new shell)"
+} else {
+  claude plugin marketplace remove incubator-os 2>$null
+  claude plugin marketplace add austinmarchese/incubator-os-plugin
+  claude plugin install "inc-os@incubator-os"
+}
 
 # Install Anthropic's frontend-design plugin (UI/web tooling)
 Write-Host "  Installing frontend-design from Anthropic's plugin marketplace..."
-claude plugin marketplace add anthropics/claude-plugins-official 2>$null
-claude plugin install "frontend-design@claude-plugins-official" 2>$null
-Write-Host "  + Installed plugin: frontend-design@claude-plugins-official" -ForegroundColor Green
+if (Get-Command claude -ErrorAction SilentlyContinue) {
+  claude plugin marketplace add anthropics/claude-plugins-official 2>$null
+  claude plugin install "frontend-design@claude-plugins-official" 2>$null
+  Write-Host "  + Installed plugin: frontend-design@claude-plugins-official" -ForegroundColor Green
+} else {
+  Write-Host "  ! Skipped frontend-design (claude CLI not on PATH yet)" -ForegroundColor Yellow
+  Track-Failure "frontend-design plugin (claude CLI not on PATH - rerun in a new shell)"
+}
 
 # ── Inject CLAUDE.md block ─────────────────────────────────────────
 $ClaudeMd = Join-Path $HOME ".claude\CLAUDE.md"
