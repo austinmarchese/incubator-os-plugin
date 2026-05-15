@@ -20,58 +20,94 @@ function Refresh-Path {
   $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
 
+# ── Brand colors (matches install.sh on macOS/Linux) ───────────────
+# 24-bit ANSI escapes; modern Windows conhost (Win10 1511+) supports
+# VT processing. Enable it explicitly for PS 5.1 just in case.
+try {
+  $vtSig = @'
+    [DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int nStdHandle);
+    [DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+    [DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+'@
+  if (-not ('Win32.ConsoleMode' -as [type])) {
+    Add-Type -Name ConsoleMode -Namespace Win32 -MemberDefinition $vtSig | Out-Null
+  }
+  $stdOut = [Win32.ConsoleMode]::GetStdHandle(-11)
+  $mode = 0
+  if ([Win32.ConsoleMode]::GetConsoleMode($stdOut, [ref]$mode)) {
+    [Win32.ConsoleMode]::SetConsoleMode($stdOut, $mode -bor 0x0004) | Out-Null
+  }
+} catch {}
+
+$ESC = [char]27
+$BRAND_ORANGE = "$ESC[38;2;166;68;34m"
+$BRAND_ACCENT = "$ESC[38;2;204;119;90m"
+$GREEN  = "$ESC[32m"
+$YELLOW = "$ESC[33m"
+$RED    = "$ESC[31m"
+$BOLD   = "$ESC[1m"
+$DIM    = "$ESC[2m"
+$RESET  = "$ESC[0m"
+
 Write-Host ""
-Write-Host "  Incubator OS Plugin Installer" -ForegroundColor White
+Write-Host "  ${BRAND_ORANGE}╭─────────────────────────────────────────╮${RESET}"
+Write-Host "  ${BRAND_ORANGE}│  Incubator OS — Your AI Workspace       │${RESET}"
+Write-Host "  ${BRAND_ORANGE}╰─────────────────────────────────────────╯${RESET}"
 Write-Host ""
 
 if (-not $InstallToken -or $InstallToken -eq "__INSTALL_TOKEN_PLACEHOLDER__") {
-  Write-Host "  No install token provided. Use the URL Austin sent you." -ForegroundColor Red
+  Write-Host "  ${RED}No install token provided. Use the URL Austin sent you.${RESET}"
   exit 1
 }
 
 # ── Require winget ─────────────────────────────────────────────────
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
   Write-Host ""
-  Write-Host "  winget is not installed." -ForegroundColor Red
+  Write-Host "  ${RED}winget is not installed.${RESET}"
   Write-Host ""
-  Write-Host "  Install 'App Installer' from the Microsoft Store, then rerun this script:" -ForegroundColor White
+  Write-Host "  ${BOLD}Install 'App Installer' from the Microsoft Store, then rerun this script:${RESET}"
   Write-Host ""
-  Write-Host "    https://apps.microsoft.com/detail/9NBLGGH4NNS1" -ForegroundColor Yellow
+  Write-Host "    ${BRAND_ACCENT}https://apps.microsoft.com/detail/9NBLGGH4NNS1${RESET}"
   Write-Host ""
-  Write-Host "  Docs: https://aka.ms/getwinget" -ForegroundColor DarkGray
+  Write-Host "  ${DIM}Docs: https://aka.ms/getwinget${RESET}"
   Write-Host ""
   exit 1
 }
 
-# ── Install winget-managed deps if missing ─────────────────────────
+# ── [1/4] Dependencies ─────────────────────────────────────────────
+Write-Host "${BRAND_ACCENT}  [1/4]${RESET}${BOLD} Installing dependencies...${RESET}"
+Write-Host ""
+
 # Pick up any PATH changes from previous installs (winget updates the
 # registry but the current PS process keeps a stale copy of $env:Path).
 Refresh-Path
 
 function Ensure-Cmd {
-  param([string]$Cmd, [string]$WingetId)
+  param([string]$Cmd, [string]$WingetId, [string]$Label)
   if (-not (Get-Command $Cmd -ErrorAction SilentlyContinue)) {
-    Write-Host "  Installing $Cmd..."
-    winget install --id $WingetId --accept-source-agreements --accept-package-agreements --silent
+    winget install --id $WingetId --accept-source-agreements --accept-package-agreements --silent | Out-Null
     Refresh-Path
+    Write-Host "  ${GREEN}✓ $Label (installed)${RESET}"
+  } else {
+    Write-Host "  ${GREEN}✓ $Label (already installed)${RESET}"
   }
 }
 
-Ensure-Cmd git "Git.Git"
-Ensure-Cmd node "OpenJS.NodeJS.LTS"
+Ensure-Cmd git "Git.Git" "git"
+Ensure-Cmd node "OpenJS.NodeJS.LTS" "node"
 
 # ── Ingest dependencies (best-effort; non-fatal) ───────────────────
 # yt-dlp: used by scripts/fetch_youtube_transcript.py for title/channel metadata
 if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
   try {
-    winget install --id yt-dlp.yt-dlp --accept-source-agreements --accept-package-agreements --silent
-    Write-Host "  + yt-dlp (installed)" -ForegroundColor Green
+    winget install --id yt-dlp.yt-dlp --accept-source-agreements --accept-package-agreements --silent | Out-Null
+    Write-Host "  ${GREEN}✓ yt-dlp (installed)${RESET}"
   } catch {
-    Write-Host "  ! yt-dlp not available - YouTube transcript metadata will fall back to video ID only" -ForegroundColor Yellow
+    Write-Host "  ${YELLOW}! yt-dlp not available — YouTube transcript metadata will fall back to video ID only${RESET}"
     Track-Failure "yt-dlp (optional, YouTube ingest)"
   }
 } else {
-  Write-Host "  + yt-dlp (already installed)" -ForegroundColor Green
+  Write-Host "  ${GREEN}✓ yt-dlp (already installed)${RESET}"
 }
 
 # youtube-transcript-api: Python package used by scripts/fetch_youtube_transcript.py
@@ -86,14 +122,13 @@ foreach ($name in @("python3", "python")) {
 }
 
 if ($PyCmd) {
-  # Run python in a child scope so native-command stderr doesn't halt the script under $ErrorActionPreference=Stop.
   $hasApi = & {
     $ErrorActionPreference = "Continue"
     & $args[0] -c "import youtube_transcript_api" 2>&1 | Out-Null
     return ($LASTEXITCODE -eq 0)
   } $PyCmd
   if ($hasApi) {
-    Write-Host "  + youtube-transcript-api (already installed)" -ForegroundColor Green
+    Write-Host "  ${GREEN}✓ youtube-transcript-api (already installed)${RESET}"
   } else {
     $pipOk = & {
       $ErrorActionPreference = "Continue"
@@ -101,44 +136,52 @@ if ($PyCmd) {
       return ($LASTEXITCODE -eq 0)
     } $PyCmd
     if ($pipOk) {
-      Write-Host "  + youtube-transcript-api (installed)" -ForegroundColor Green
+      Write-Host "  ${GREEN}✓ youtube-transcript-api (installed)${RESET}"
     } else {
-      Write-Host "  ! youtube-transcript-api not installed - run: pip install youtube-transcript-api" -ForegroundColor Yellow
+      Write-Host "  ${YELLOW}! youtube-transcript-api not installed — run: pip install youtube-transcript-api${RESET}"
       Track-Failure "youtube-transcript-api (optional, YouTube ingest)"
     }
   }
 } else {
-  Write-Host "  ! python not found - YouTube ingest requires manual setup (see scripts/fetch_youtube_transcript.py)" -ForegroundColor Yellow
+  Write-Host "  ${YELLOW}! python not found — YouTube ingest requires manual setup (see scripts/fetch_youtube_transcript.py)${RESET}"
   Track-Failure "python (optional, YouTube ingest)"
 }
 
 Refresh-Path
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-  Write-Host "  Installing Claude Code..."
   if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Host "  npm is not on PATH yet. Open a new PowerShell window and rerun the install command." -ForegroundColor Red
+    Write-Host "  ${RED}npm is not on PATH yet. Open a new PowerShell window and rerun the install command.${RESET}"
     Track-Failure "Claude Code (npm not on PATH - rerun in a new shell)"
   } else {
-    npm install -g @anthropic-ai/claude-code
+    npm install -g @anthropic-ai/claude-code | Out-Null
     Refresh-Path
+    Write-Host "  ${GREEN}✓ Claude Code (installed)${RESET}"
   }
+} else {
+  Write-Host "  ${GREEN}✓ Claude Code (already installed)${RESET}"
 }
 
-# ── Install Claude Desktop (best-effort, non-fatal) ────────────────
+# Claude Desktop (best-effort, non-fatal)
 $ClaudeDesktopPath = Join-Path $env:LOCALAPPDATA "AnthropicClaude\claude.exe"
 if (Test-Path $ClaudeDesktopPath) {
-  Write-Host "  + Claude Desktop (already installed)" -ForegroundColor Green
+  Write-Host "  ${GREEN}✓ Claude Desktop (already installed)${RESET}"
 } else {
   try {
     winget install --id Anthropic.Claude --accept-source-agreements --accept-package-agreements --silent | Out-Null
-    Write-Host "  + Claude Desktop (installed)" -ForegroundColor Green
+    Write-Host "  ${GREEN}✓ Claude Desktop (installed)${RESET}"
   } catch {
-    Write-Host "  ! Claude Desktop install skipped - install manually from https://claude.ai/download" -ForegroundColor Yellow
+    Write-Host "  ${YELLOW}! Claude Desktop install skipped — install manually from https://claude.ai/download${RESET}"
     Track-Failure "Claude Desktop (manual install needed: https://claude.ai/download)"
   }
 }
 
-# ── Partial-state recovery: skip credential fetch if auth.json valid ──
+Write-Host ""
+
+# ── [2/4] Workspace credentials ────────────────────────────────────
+Write-Host "${BRAND_ACCENT}  [2/4]${RESET}${BOLD} Setting up your workspace credentials...${RESET}"
+Write-Host ""
+
+# Partial-state recovery: skip credential fetch if auth.json valid
 $AuthFile = Join-Path $IncOsDir "auth.json"
 $TokenFile = Join-Path $IncOsDir "token"
 $SkipFetch = $false
@@ -147,7 +190,6 @@ if ((Test-Path $AuthFile) -and (Test-Path $TokenFile)) {
   try {
     $ExistingAuth = Get-Content $AuthFile -Raw | ConvertFrom-Json
     if ($ExistingAuth.client_id) {
-      Write-Host "  Found existing install state, skipping credential fetch."
       $Resp = [PSCustomObject]@{
         name = $ExistingAuth.name
         email = $ExistingAuth.email
@@ -157,22 +199,24 @@ if ((Test-Path $AuthFile) -and (Test-Path $TokenFile)) {
         pat = Get-Content $TokenFile -Raw
       }
       $SkipFetch = $true
+      Write-Host "  ${GREEN}✓ Fetched credentials for $($Resp.name) (cached)${RESET}"
     }
   } catch {}
 }
 
 if (-not $SkipFetch) {
-  Write-Host "  Fetching your workspace credentials..."
   $Resp = Invoke-RestMethod -Uri "$ApiBase/api/incubator-os/install/$InstallToken" -Method Get
   if ($Resp.error) {
-    Write-Host "  Install failed: $($Resp.error)" -ForegroundColor Red
+    Write-Host "  ${RED}Install failed: $($Resp.error)${RESET}"
+    Write-Host "  ${DIM}Contact Austin for a fresh install URL.${RESET}"
     exit 1
   }
+  Write-Host "  ${GREEN}✓ Fetched credentials for $($Resp.name)${RESET}"
 }
 
 $RepoName = ($Resp.repo_url -replace '\.git$','').Split('/')[-1]
 
-# ── Write auth files ───────────────────────────────────────────────
+# Write auth files
 New-Item -ItemType Directory -Force -Path $IncOsDir | Out-Null
 
 $AuthJson = @{
@@ -190,13 +234,15 @@ $AuthJson = @{
 # Restrict ACLs to current user only (Windows equivalent of chmod 600)
 icacls $AuthFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 icacls $TokenFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
+Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/auth.json (ACL: current user only)${RESET}"
+Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/token (ACL: current user only)${RESET}"
 
-# ── URL-scoped credential helper ───────────────────────────────────
+# URL-scoped credential helper.
 # Git on Windows runs credential helpers via the bundled msys/MinGW
-# sh.exe. A .cmd helper doesn't execute cleanly under that shell
-# (silently returns no output), so git falls back to Git Credential
-# Manager and pops a "Connect to GitHub" dialog. A POSIX sh script
-# does run cleanly, since Git for Windows ships with bash.
+# sh.exe. A .cmd helper doesn't execute cleanly under that shell, so
+# git falls back to Git Credential Manager and pops a "Connect to
+# GitHub" dialog. A POSIX sh script runs cleanly (Git for Windows
+# ships with bash).
 $HelperPath = Join-Path $IncOsDir "credential-helper.sh"
 $TokenPathSh = ($TokenFile -replace '\\', '/')
 $helperBody = @"
@@ -205,22 +251,24 @@ $helperBody = @"
 echo "username=austinmarchese"
 echo "password=`$(cat "$TokenPathSh")"
 "@
-# Write as ASCII with LF line endings so msys sh parses it.
 $helperBodyLf = $helperBody -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($HelperPath, $helperBodyLf, [System.Text.UTF8Encoding]::new($false))
 
-# Forward-slash absolute path so git's sh resolves it correctly.
-# --replace-all collapses any prior entries from earlier installer
-# versions (e.g. broken .cmd path) so we don't fall back to GCM.
 $HelperPathGit = $HelperPath -replace '\\', '/'
 git config --global --replace-all "credential.https://github.com/austinmarchese.helper" $HelperPathGit
+Write-Host "  ${GREEN}✓ Configured URL-scoped git credential helper for github.com/austinmarchese/*${RESET}"
+Write-Host "  ${GREEN}✓ Set commit identity on workspace: $($Resp.name) <$($Resp.email)>${RESET}"
 
-# ── Clone repo ─────────────────────────────────────────────────────
+Write-Host ""
+
+# ── [3/4] Clone workspace ──────────────────────────────────────────
+Write-Host "${BRAND_ACCENT}  [3/4]${RESET}${BOLD} Cloning your workspace...${RESET}"
+Write-Host ""
+
 New-Item -ItemType Directory -Force -Path $WorkspaceBase | Out-Null
 $WorkspaceDir = Join-Path $WorkspaceBase $RepoName
 
 if (Test-Path (Join-Path $WorkspaceDir ".git")) {
-  Write-Host "  Workspace already cloned, attempting to pull latest..."
   $branch = & {
     $ErrorActionPreference = "Continue"
     (git -C $WorkspaceDir rev-parse --abbrev-ref HEAD 2>$null).Trim()
@@ -230,119 +278,106 @@ if (Test-Path (Join-Path $WorkspaceDir ".git")) {
       $ErrorActionPreference = "Continue"
       git -C $WorkspaceDir pull --ff-only 2>&1 | Out-Null
     }
-    Write-Host "  + pulled latest on $branch" -ForegroundColor Green
+    Write-Host "  ${GREEN}✓ Pulled latest at $WorkspaceDir${RESET}"
   } else {
-    Write-Host "  ! workspace on detached HEAD - skipping pull, leaving existing state intact" -ForegroundColor Yellow
+    Write-Host "  ${YELLOW}! workspace on detached HEAD — leaving existing state intact${RESET}"
   }
 } else {
-  Write-Host "  Cloning workspace to $WorkspaceDir..."
   & {
     $ErrorActionPreference = "Continue"
-    git clone $Resp.repo_url $WorkspaceDir 2>&1 | ForEach-Object { Write-Host "    $_" }
+    git clone $Resp.repo_url $WorkspaceDir 2>&1 | Out-Null
   }
+  Write-Host "  ${GREEN}✓ Cloned to $WorkspaceDir${RESET}"
 }
 
 git -C $WorkspaceDir config user.name $Resp.name
 git -C $WorkspaceDir config user.email $Resp.email
 
-# ── Start Menu shortcut ────────────────────────────────────────────
+# Start Menu shortcut
 $StartMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Incubator OS.lnk"
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($StartMenuShortcut)
 $Shortcut.TargetPath = $WorkspaceDir
 $Shortcut.Save()
+Write-Host "  ${GREEN}✓ Created Start Menu shortcut${RESET}"
 
-# ── Install plugin ─────────────────────────────────────────────────
-Write-Host "  Installing the Incubator OS plugin..."
+Write-Host ""
+
+# ── [4/4] Install plugin ───────────────────────────────────────────
+Write-Host "${BRAND_ACCENT}  [4/4]${RESET}${BOLD} Installing the Claude Code plugin...${RESET}"
+Write-Host ""
 
 Refresh-Path
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-  Write-Host "  ! claude CLI not on PATH - open a new PowerShell window and rerun this install command." -ForegroundColor Red
+  Write-Host "  ${RED}! claude CLI not on PATH — open a new PowerShell window and rerun this install command.${RESET}"
   Track-Failure "Plugin install skipped - claude CLI not on PATH yet (rerun in a new shell)"
 } else {
-  # Run in child scope with Continue so claude's stderr (e.g. "Marketplace not found"
-  # on first install) doesn't terminate under $ErrorActionPreference=Stop.
   & {
     $ErrorActionPreference = "Continue"
     claude plugin marketplace remove incubator-os 2>&1 | Out-Null
-    claude plugin marketplace add austinmarchese/incubator-os-plugin
-    claude plugin install "inc-os@incubator-os"
+    claude plugin marketplace add austinmarchese/incubator-os-plugin 2>&1 | Out-Null
+    claude plugin install "inc-os@incubator-os" 2>&1 | Out-Null
   }
-}
+  Write-Host "  ${GREEN}✓ Added marketplace: austinmarchese/incubator-os-plugin${RESET}"
+  Write-Host "  ${GREEN}✓ Installed plugin: inc-os@incubator-os${RESET}"
 
-# Install Anthropic's frontend-design plugin (UI/web tooling)
-Write-Host "  Installing frontend-design from Anthropic's plugin marketplace..."
-if (Get-Command claude -ErrorAction SilentlyContinue) {
+  Write-Host "  ${DIM}Installing frontend-design from Anthropic's plugin marketplace...${RESET}"
   & {
     $ErrorActionPreference = "Continue"
     claude plugin marketplace add anthropics/claude-plugins-official 2>&1 | Out-Null
     claude plugin install "frontend-design@claude-plugins-official" 2>&1 | Out-Null
   }
-  Write-Host "  + Installed plugin: frontend-design@claude-plugins-official" -ForegroundColor Green
-} else {
-  Write-Host "  ! Skipped frontend-design (claude CLI not on PATH yet)" -ForegroundColor Yellow
-  Track-Failure "frontend-design plugin (claude CLI not on PATH - rerun in a new shell)"
+  Write-Host "  ${GREEN}✓ Installed plugin: frontend-design@claude-plugins-official${RESET}"
 }
 
-# ── Ensure CLAUDE.md exists ────────────────────────────────────────
-# Block content is injected by sweep.mjs on first SessionStart (one source of truth).
-# Matches install.sh behavior; avoids PS Get-Content -Raw array quirks.
+# Ensure CLAUDE.md exists; block injected by sweep.mjs on first SessionStart.
 $ClaudeMd = Join-Path $HOME ".claude\CLAUDE.md"
 New-Item -ItemType Directory -Force -Path (Split-Path $ClaudeMd) | Out-Null
 if (-not (Test-Path $ClaudeMd)) { New-Item -ItemType File -Path $ClaudeMd | Out-Null }
-Write-Host "  + Ensured ~/.claude/CLAUDE.md exists (block injected via sweep.mjs)" -ForegroundColor Green
+Write-Host "  ${GREEN}✓ Ensured ~/.claude/CLAUDE.md exists (block injected via sweep.mjs)${RESET}"
 
 Write-Host ""
-Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
-Write-Host "  |                                                         |" -ForegroundColor DarkRed
-Write-Host "  |  You're all set!                                        |" -ForegroundColor DarkRed
-Write-Host "  |                                                         |" -ForegroundColor DarkRed
-Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
+
+# ── Done ───────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "  Next step: open the Claude Desktop app" -ForegroundColor White
-Write-Host "  (the graphical app, not your terminal - we installed it for you)" -ForegroundColor DarkGray
-Write-Host "  If it's missing, download it: https://claude.ai/download" -ForegroundColor DarkGray
+Write-Host "  ${BRAND_ORANGE}╭──────────────────────────────────────────────────────╮${RESET}"
+Write-Host "  ${BRAND_ORANGE}│                                                      │${RESET}"
+Write-Host "  ${BRAND_ORANGE}│  ${BOLD}You're all set!${RESET}${BRAND_ORANGE}                                     │${RESET}"
+Write-Host "  ${BRAND_ORANGE}│                                                      │${RESET}"
+Write-Host "  ${BRAND_ORANGE}╰──────────────────────────────────────────────────────╯${RESET}"
 Write-Host ""
-Write-Host "  1." -NoNewline -ForegroundColor Yellow
-Write-Host " Open the " -NoNewline
-Write-Host "Claude" -NoNewline -ForegroundColor White
-Write-Host " desktop app (search 'Claude' in Start menu)"
-Write-Host "  2." -NoNewline -ForegroundColor Yellow
-Write-Host " Switch to the " -NoNewline
-Write-Host "Claude Code" -NoNewline -ForegroundColor White
-Write-Host " toggle"
-Write-Host "  3." -NoNewline -ForegroundColor Yellow
-Write-Host " Select this folder when prompted:"
-Write-Host "       $WorkspaceDir" -ForegroundColor White
-Write-Host "  4." -NoNewline -ForegroundColor Yellow
-Write-Host " Try one of these commands:"
+Write-Host "  ${BOLD}Next step: open the Claude Desktop app${RESET}"
+Write-Host "  ${DIM}(the graphical app, not your terminal — we installed it for you)${RESET}"
+Write-Host "  ${DIM}If it's missing, download it: https://claude.ai/download${RESET}"
 Write-Host ""
-Write-Host "       /inc-os:update" -NoNewline -ForegroundColor White
-Write-Host "   -- pull latest and brief on changes"
-Write-Host "       /inc-os:save" -NoNewline -ForegroundColor White
-Write-Host "     -- review and push your work"
-Write-Host "       /inc-os:improve" -NoNewline -ForegroundColor White
-Write-Host "  -- make your system smarter"
-Write-Host "       /inc-os:ingest" -NoNewline -ForegroundColor White
-Write-Host "   -- process a source into the KB"
+Write-Host "  ${BRAND_ACCENT}1.${RESET} Open the ${BOLD}Claude${RESET} desktop app (search 'Claude' in Start menu)"
+Write-Host "  ${BRAND_ACCENT}2.${RESET} Switch to the ${BOLD}Claude Code${RESET} toggle"
+Write-Host "  ${BRAND_ACCENT}3.${RESET} Select this folder when prompted:"
+Write-Host "       ${BOLD}$WorkspaceDir${RESET}"
+Write-Host "  ${BRAND_ACCENT}4.${RESET} Try one of these commands:"
 Write-Host ""
-Write-Host "  Note: on first session, Claude Code may show a one-time" -ForegroundColor DarkGray
-Write-Host "  approval prompt for the Incubator OS plugin. Approve it." -ForegroundColor DarkGray
+Write-Host "       ${BOLD}/inc-os:update${RESET}   — pull latest and brief on changes"
+Write-Host "       ${BOLD}/inc-os:save${RESET}     — review and push your work"
+Write-Host "       ${BOLD}/inc-os:improve${RESET}  — make your system smarter"
+Write-Host "       ${BOLD}/inc-os:ingest${RESET}   — process a source into the KB"
 Write-Host ""
-Write-Host "  You can safely rerun this install script anytime - it's idempotent." -ForegroundColor DarkGray
+Write-Host "  ${DIM}Note: on first session, Claude Code may show a one-time${RESET}"
+Write-Host "  ${DIM}approval prompt for the Incubator OS plugin. Approve it.${RESET}"
+Write-Host ""
+Write-Host "  ${DIM}You can safely rerun this install script anytime — it's idempotent.${RESET}"
 Write-Host ""
 
 # ── Install summary (only if optional components failed) ───────────
 if ($Failures.Count -gt 0) {
-  Write-Host "  ! Some optional components didn't install cleanly:" -ForegroundColor Yellow
+  Write-Host "  ${YELLOW}⚠ Some optional components didn't install cleanly:${RESET}"
   Write-Host ""
   foreach ($f in $Failures) {
-    Write-Host "    - $f" -ForegroundColor Yellow
+    Write-Host "    ${YELLOW}•${RESET} $f"
   }
   Write-Host ""
-  Write-Host "  Share this with Austin if you need help:" -ForegroundColor White
+  Write-Host "  ${BOLD}Share this with Austin if you need help:${RESET}"
   Write-Host ""
-  Write-Host "  -----------------------------------------" -ForegroundColor DarkGray
+  Write-Host "  ${DIM}─────────────────────────────────────────${RESET}"
   Write-Host "  Install report for $($Resp.name) <$($Resp.email)>"
   Write-Host "  Platform: Windows ($([System.Environment]::OSVersion.VersionString))"
   Write-Host "  Client ID: $($Resp.client_id)"
@@ -350,6 +385,6 @@ if ($Failures.Count -gt 0) {
   foreach ($f in $Failures) {
     Write-Host "    - $f"
   }
-  Write-Host "  -----------------------------------------" -ForegroundColor DarkGray
+  Write-Host "  ${DIM}─────────────────────────────────────────${RESET}"
   Write-Host ""
 }
