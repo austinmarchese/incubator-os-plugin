@@ -218,11 +218,26 @@ New-Item -ItemType Directory -Force -Path $WorkspaceBase | Out-Null
 $WorkspaceDir = Join-Path $WorkspaceBase $RepoName
 
 if (Test-Path (Join-Path $WorkspaceDir ".git")) {
-  Write-Host "  Workspace already cloned, pulling latest..."
-  git -C $WorkspaceDir pull --ff-only
+  Write-Host "  Workspace already cloned, attempting to pull latest..."
+  $branch = & {
+    $ErrorActionPreference = "Continue"
+    (git -C $WorkspaceDir rev-parse --abbrev-ref HEAD 2>$null).Trim()
+  }
+  if ($branch -and $branch -ne "HEAD") {
+    & {
+      $ErrorActionPreference = "Continue"
+      git -C $WorkspaceDir pull --ff-only 2>&1 | Out-Null
+    }
+    Write-Host "  + pulled latest on $branch" -ForegroundColor Green
+  } else {
+    Write-Host "  ! workspace on detached HEAD - skipping pull, leaving existing state intact" -ForegroundColor Yellow
+  }
 } else {
   Write-Host "  Cloning workspace to $WorkspaceDir..."
-  git clone $Resp.repo_url $WorkspaceDir
+  & {
+    $ErrorActionPreference = "Continue"
+    git clone $Resp.repo_url $WorkspaceDir 2>&1 | ForEach-Object { Write-Host "    $_" }
+  }
 }
 
 git -C $WorkspaceDir config user.name $Resp.name
@@ -243,16 +258,24 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Write-Host "  ! claude CLI not on PATH - open a new PowerShell window and rerun this install command." -ForegroundColor Red
   Track-Failure "Plugin install skipped - claude CLI not on PATH yet (rerun in a new shell)"
 } else {
-  claude plugin marketplace remove incubator-os 2>$null
-  claude plugin marketplace add austinmarchese/incubator-os-plugin
-  claude plugin install "inc-os@incubator-os"
+  # Run in child scope with Continue so claude's stderr (e.g. "Marketplace not found"
+  # on first install) doesn't terminate under $ErrorActionPreference=Stop.
+  & {
+    $ErrorActionPreference = "Continue"
+    claude plugin marketplace remove incubator-os 2>&1 | Out-Null
+    claude plugin marketplace add austinmarchese/incubator-os-plugin
+    claude plugin install "inc-os@incubator-os"
+  }
 }
 
 # Install Anthropic's frontend-design plugin (UI/web tooling)
 Write-Host "  Installing frontend-design from Anthropic's plugin marketplace..."
 if (Get-Command claude -ErrorAction SilentlyContinue) {
-  claude plugin marketplace add anthropics/claude-plugins-official 2>$null
-  claude plugin install "frontend-design@claude-plugins-official" 2>$null
+  & {
+    $ErrorActionPreference = "Continue"
+    claude plugin marketplace add anthropics/claude-plugins-official 2>&1 | Out-Null
+    claude plugin install "frontend-design@claude-plugins-official" 2>&1 | Out-Null
+  }
   Write-Host "  + Installed plugin: frontend-design@claude-plugins-official" -ForegroundColor Green
 } else {
   Write-Host "  ! Skipped frontend-design (claude CLI not on PATH yet)" -ForegroundColor Yellow
