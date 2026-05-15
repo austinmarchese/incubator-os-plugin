@@ -64,18 +64,34 @@ if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
 }
 
 # youtube-transcript-api: Python package used by scripts/fetch_youtube_transcript.py
-$PyCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } `
-         elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } `
-         else { $null }
+# Skip Microsoft Store alias stubs (WindowsApps path) — those are install shortcuts, not Python.
+$PyCmd = $null
+foreach ($name in @("python3", "python")) {
+  $cmd = Get-Command $name -ErrorAction SilentlyContinue
+  if ($cmd -and $cmd.Source -notlike "*\WindowsApps\*") {
+    $PyCmd = $name
+    break
+  }
+}
+
 if ($PyCmd) {
-  $HasApi = & $PyCmd -c "import youtube_transcript_api" 2>$null
-  if ($LASTEXITCODE -eq 0) {
+  # Run python in a child scope so native-command stderr doesn't halt the script under $ErrorActionPreference=Stop.
+  $hasApi = & {
+    $ErrorActionPreference = "Continue"
+    & $args[0] -c "import youtube_transcript_api" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+  } $PyCmd
+  if ($hasApi) {
     Write-Host "  + youtube-transcript-api (already installed)" -ForegroundColor Green
   } else {
-    try {
-      & $PyCmd -m pip install --quiet youtube-transcript-api 2>$null
+    $pipOk = & {
+      $ErrorActionPreference = "Continue"
+      & $args[0] -m pip install --quiet youtube-transcript-api 2>&1 | Out-Null
+      return ($LASTEXITCODE -eq 0)
+    } $PyCmd
+    if ($pipOk) {
       Write-Host "  + youtube-transcript-api (installed)" -ForegroundColor Green
-    } catch {
+    } else {
       Write-Host "  ! youtube-transcript-api not installed - run: pip install youtube-transcript-api" -ForegroundColor Yellow
       Track-Failure "youtube-transcript-api (optional, YouTube ingest)"
     }
