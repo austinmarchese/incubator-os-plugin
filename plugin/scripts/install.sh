@@ -11,6 +11,10 @@ API_BASE="${INCUBATOR_OS_API_BASE:-https://www.incubator-os.com}"
 INC_OS_DIR="$HOME/.incubator-os"
 WORKSPACE_BASE="$HOME/incubator"
 
+# Track best-effort failures for end-of-install summary
+FAILURES=()
+track_fail() { FAILURES+=("$1"); }
+
 # Brand colors (theincubator.xyz)
 BRAND_ORANGE='\033[38;2;166;68;34m'      # #a64422
 BRAND_ACCENT='\033[38;2;204;119;90m'     # #cc775a
@@ -45,12 +49,19 @@ case "$OS" in
   *)      echo -e "  ${RED}Unsupported OS: $OS${RESET}"; exit 1 ;;
 esac
 
-# ── Install Homebrew (macOS) if missing ────────────────────────────
+# ── Require Homebrew (macOS) ───────────────────────────────────────
 if [ "$PLATFORM" = "macos" ]; then
   if ! command -v brew >/dev/null 2>&1; then
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)"
-    echo -e "  ${GREEN}✓ Homebrew (installed)${RESET}"
+    echo ""
+    echo -e "  ${RED}Homebrew is not installed.${RESET}"
+    echo ""
+    echo -e "  ${BOLD}Install it by running this command, then rerun the install script:${RESET}"
+    echo ""
+    echo -e "    ${BRAND_ACCENT}/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${RESET}"
+    echo ""
+    echo -e "  ${DIM}Docs: https://brew.sh${RESET}"
+    echo ""
+    exit 1
   else
     echo -e "  ${GREEN}✓ Homebrew (already installed)${RESET}"
   fi
@@ -84,9 +95,12 @@ done
 # ── Ingest dependencies (best-effort; non-fatal) ───────────────────
 # yt-dlp: used by scripts/fetch_youtube_transcript.py for title/channel metadata
 if ! command -v yt-dlp >/dev/null 2>&1; then
-  install_pkg yt-dlp 2>/dev/null \
-    && echo -e "  ${GREEN}✓ yt-dlp (installed)${RESET}" \
-    || echo -e "  ${YELLOW}! yt-dlp not available — YouTube transcript metadata will fall back to video ID only${RESET}"
+  if install_pkg yt-dlp 2>/dev/null; then
+    echo -e "  ${GREEN}✓ yt-dlp (installed)${RESET}"
+  else
+    echo -e "  ${YELLOW}! yt-dlp not available — YouTube transcript metadata will fall back to video ID only${RESET}"
+    track_fail "yt-dlp (optional, YouTube ingest)"
+  fi
 else
   echo -e "  ${GREEN}✓ yt-dlp (already installed)${RESET}"
 fi
@@ -98,12 +112,16 @@ if [ -n "$PY" ]; then
   if "$PY" -c "import youtube_transcript_api" >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓ youtube-transcript-api (already installed)${RESET}"
   else
-    "$PY" -m pip install --quiet youtube-transcript-api 2>/dev/null \
-      && echo -e "  ${GREEN}✓ youtube-transcript-api (installed)${RESET}" \
-      || echo -e "  ${YELLOW}! youtube-transcript-api not installed — run: pip install youtube-transcript-api${RESET}"
+    if "$PY" -m pip install --quiet youtube-transcript-api 2>/dev/null; then
+      echo -e "  ${GREEN}✓ youtube-transcript-api (installed)${RESET}"
+    else
+      echo -e "  ${YELLOW}! youtube-transcript-api not installed — run: pip install youtube-transcript-api${RESET}"
+      track_fail "youtube-transcript-api (optional, YouTube ingest)"
+    fi
   fi
 else
   echo -e "  ${YELLOW}! python3 not found — YouTube ingest requires manual setup (see scripts/fetch_youtube_transcript.py)${RESET}"
+  track_fail "python3 (optional, YouTube ingest)"
 fi
 
 if ! command -v claude >/dev/null 2>&1; then
@@ -111,6 +129,20 @@ if ! command -v claude >/dev/null 2>&1; then
   echo -e "  ${GREEN}✓ Claude Code (installed)${RESET}"
 else
   echo -e "  ${GREEN}✓ Claude Code (already installed)${RESET}"
+fi
+
+# ── Install Claude Desktop (macOS only, best-effort) ───────────────
+if [ "$PLATFORM" = "macos" ]; then
+  if [ -d "/Applications/Claude.app" ]; then
+    echo -e "  ${GREEN}✓ Claude Desktop (already installed)${RESET}"
+  else
+    if brew install --cask claude >/dev/null 2>&1; then
+      echo -e "  ${GREEN}✓ Claude Desktop (installed)${RESET}"
+    else
+      echo -e "  ${YELLOW}! Claude Desktop install skipped — install manually from https://claude.ai/download${RESET}"
+      track_fail "Claude Desktop (manual install needed: https://claude.ai/download)"
+    fi
+  fi
 fi
 
 echo ""
@@ -276,3 +308,27 @@ echo ""
 echo -e "  ${DIM}Note: on first session, Claude Code may show a one-time${RESET}"
 echo -e "  ${DIM}approval prompt for the Incubator OS plugin. Approve it.${RESET}"
 echo ""
+echo -e "  ${DIM}You can safely rerun this install script anytime — it's idempotent.${RESET}"
+echo ""
+
+# ── Install summary (only if optional components failed) ───────────
+if [ ${#FAILURES[@]} -gt 0 ]; then
+  echo -e "${YELLOW}  ⚠ Some optional components didn't install cleanly:${RESET}"
+  echo ""
+  for f in "${FAILURES[@]}"; do
+    echo -e "    ${YELLOW}•${RESET} $f"
+  done
+  echo ""
+  echo -e "${BOLD}  Share this with Austin if you need help:${RESET}"
+  echo ""
+  echo -e "  ${DIM}─────────────────────────────────────────${RESET}"
+  echo -e "  Install report for $NAME <$EMAIL>"
+  echo -e "  Platform: $PLATFORM ($(uname -srm))"
+  echo -e "  Client ID: $CLIENT_ID"
+  echo -e "  Failures:"
+  for f in "${FAILURES[@]}"; do
+    echo -e "    - $f"
+  done
+  echo -e "  ${DIM}─────────────────────────────────────────${RESET}"
+  echo ""
+fi

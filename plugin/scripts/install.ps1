@@ -10,12 +10,30 @@ $ApiBase = if ($env:INCUBATOR_OS_API_BASE) { $env:INCUBATOR_OS_API_BASE } else {
 $IncOsDir = Join-Path $HOME ".incubator-os"
 $WorkspaceBase = Join-Path $HOME "incubator"
 
+# Track best-effort failures for end-of-install summary
+$Failures = @()
+function Track-Failure { param([string]$msg) $script:Failures += $msg }
+
 Write-Host ""
 Write-Host "  Incubator OS Plugin Installer" -ForegroundColor White
 Write-Host ""
 
 if (-not $InstallToken -or $InstallToken -eq "__INSTALL_TOKEN_PLACEHOLDER__") {
   Write-Host "  No install token provided. Use the URL Austin sent you." -ForegroundColor Red
+  exit 1
+}
+
+# ── Require winget ─────────────────────────────────────────────────
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+  Write-Host ""
+  Write-Host "  winget is not installed." -ForegroundColor Red
+  Write-Host ""
+  Write-Host "  Install 'App Installer' from the Microsoft Store, then rerun this script:" -ForegroundColor White
+  Write-Host ""
+  Write-Host "    https://apps.microsoft.com/detail/9NBLGGH4NNS1" -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host "  Docs: https://aka.ms/getwinget" -ForegroundColor DarkGray
+  Write-Host ""
   exit 1
 }
 
@@ -39,6 +57,7 @@ if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
     Write-Host "  + yt-dlp (installed)" -ForegroundColor Green
   } catch {
     Write-Host "  ! yt-dlp not available - YouTube transcript metadata will fall back to video ID only" -ForegroundColor Yellow
+    Track-Failure "yt-dlp (optional, YouTube ingest)"
   }
 } else {
   Write-Host "  + yt-dlp (already installed)" -ForegroundColor Green
@@ -58,15 +77,31 @@ if ($PyCmd) {
       Write-Host "  + youtube-transcript-api (installed)" -ForegroundColor Green
     } catch {
       Write-Host "  ! youtube-transcript-api not installed - run: pip install youtube-transcript-api" -ForegroundColor Yellow
+      Track-Failure "youtube-transcript-api (optional, YouTube ingest)"
     }
   }
 } else {
   Write-Host "  ! python not found - YouTube ingest requires manual setup (see scripts/fetch_youtube_transcript.py)" -ForegroundColor Yellow
+  Track-Failure "python (optional, YouTube ingest)"
 }
 
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Write-Host "  Installing Claude Code..."
   npm install -g @anthropic-ai/claude-code
+}
+
+# ── Install Claude Desktop (best-effort, non-fatal) ────────────────
+$ClaudeDesktopPath = Join-Path $env:LOCALAPPDATA "AnthropicClaude\claude.exe"
+if (Test-Path $ClaudeDesktopPath) {
+  Write-Host "  + Claude Desktop (already installed)" -ForegroundColor Green
+} else {
+  try {
+    winget install --id Anthropic.Claude --accept-source-agreements --accept-package-agreements --silent | Out-Null
+    Write-Host "  + Claude Desktop (installed)" -ForegroundColor Green
+  } catch {
+    Write-Host "  ! Claude Desktop install skipped - install manually from https://claude.ai/download" -ForegroundColor Yellow
+    Track-Failure "Claude Desktop (manual install needed: https://claude.ai/download)"
+  }
 }
 
 # ── Partial-state recovery: skip credential fetch if auth.json valid ──
@@ -221,3 +256,27 @@ Write-Host ""
 Write-Host "  Note: on first session, Claude Code may show a one-time" -ForegroundColor DarkGray
 Write-Host "  approval prompt for the Incubator OS plugin. Approve it." -ForegroundColor DarkGray
 Write-Host ""
+Write-Host "  You can safely rerun this install script anytime - it's idempotent." -ForegroundColor DarkGray
+Write-Host ""
+
+# ── Install summary (only if optional components failed) ───────────
+if ($Failures.Count -gt 0) {
+  Write-Host "  ! Some optional components didn't install cleanly:" -ForegroundColor Yellow
+  Write-Host ""
+  foreach ($f in $Failures) {
+    Write-Host "    - $f" -ForegroundColor Yellow
+  }
+  Write-Host ""
+  Write-Host "  Share this with Austin if you need help:" -ForegroundColor White
+  Write-Host ""
+  Write-Host "  -----------------------------------------" -ForegroundColor DarkGray
+  Write-Host "  Install report for $($Resp.name) <$($Resp.email)>"
+  Write-Host "  Platform: Windows ($([System.Environment]::OSVersion.VersionString))"
+  Write-Host "  Client ID: $($Resp.client_id)"
+  Write-Host "  Failures:"
+  foreach ($f in $Failures) {
+    Write-Host "    - $f"
+  }
+  Write-Host "  -----------------------------------------" -ForegroundColor DarkGray
+  Write-Host ""
+}
