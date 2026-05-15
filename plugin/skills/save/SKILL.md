@@ -1,5 +1,5 @@
 ---
-name: save
+name: inc-os:save
 description: "Review local changes, walk the user through any merge conflicts, then push to origin/main."
 ---
 

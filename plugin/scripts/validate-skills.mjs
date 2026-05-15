@@ -42,12 +42,12 @@ for (const entry of fs.readdirSync(SKILLS_DIR, { withFileTypes: true })) {
     errors.push(`${folder}: frontmatter missing 'description'`);
   }
   const name = nameMatch[1].trim().replace(/^["']|["']$/g, "");
-  if (name !== folder) {
-    errors.push(`${folder}: frontmatter name '${name}' must match folder name '${folder}'`);
+  const expectedName = `inc-os:${folder}`;
+  if (name !== expectedName) {
+    errors.push(`${folder}: frontmatter name '${name}' must be '${expectedName}'`);
   }
-  const qualifiedName = `inc-os:${name}`;
-  if (!ALLOWED.has(qualifiedName)) {
-    errors.push(`${folder}: '${qualifiedName}' not in SKILL_NAMES allowlist`);
+  if (!ALLOWED.has(name)) {
+    errors.push(`${folder}: '${name}' not in SKILL_NAMES allowlist`);
   }
   if (seenNames.has(name)) {
     errors.push(`${folder}: duplicate name '${name}'`);

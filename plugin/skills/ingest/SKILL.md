@@ -1,5 +1,5 @@
 ---
-name: ingest
+name: inc-os:ingest
 description: Ingest a raw source (article, transcript, notes, YouTube URL, or attachment) into the right place — wiki/ for stable knowledge, clients/{slug}/ for client-specific material — then summarize and cross-reference.
 ---
 

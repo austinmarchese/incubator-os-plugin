@@ -1,5 +1,5 @@
 ---
-name: update
+name: inc-os:update
 description: "Pull latest changes from main and summarize what's new. Syncs skills, knowledge, frameworks, and shared Claude Code settings so your system stays current."
 ---
 
