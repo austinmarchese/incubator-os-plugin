@@ -297,12 +297,14 @@ Write-Host "  |  You're all set!                                        |" -Fore
 Write-Host "  |                                                         |" -ForegroundColor DarkRed
 Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
 Write-Host ""
-Write-Host "  Get started in Claude Desktop:" -ForegroundColor White
+Write-Host "  Next step: open the Claude Desktop app" -ForegroundColor White
+Write-Host "  (the graphical app, not your terminal - we installed it for you)" -ForegroundColor DarkGray
+Write-Host "  If it's missing, download it: https://claude.ai/download" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  1." -NoNewline -ForegroundColor Yellow
 Write-Host " Open the " -NoNewline
 Write-Host "Claude" -NoNewline -ForegroundColor White
-Write-Host " desktop app"
+Write-Host " desktop app (search 'Claude' in Start menu)"
 Write-Host "  2." -NoNewline -ForegroundColor Yellow
 Write-Host " Switch to the " -NoNewline
 Write-Host "Claude Code" -NoNewline -ForegroundColor White
