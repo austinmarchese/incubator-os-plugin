@@ -219,7 +219,11 @@ echo "password=$(cat "$HOME/.incubator-os/token")"
 HELPER
 chmod +x "$HELPER_SCRIPT"
 
-git config --global "credential.https://github.com/austinmarchese.helper" "$HELPER_SCRIPT"
+# Reset helper chain for this URL scope so osxkeychain/manager doesn't intercept.
+# `helper = ""` clears inherited helpers for the URL; the second add registers ours.
+git config --global --unset-all "credential.https://github.com/austinmarchese.helper" 2>/dev/null || true
+git config --global --add "credential.https://github.com/austinmarchese.helper" ""
+git config --global --add "credential.https://github.com/austinmarchese.helper" "$HELPER_SCRIPT"
 echo -e "  ${GREEN}✓ Configured URL-scoped git credential helper for github.com/austinmarchese/*${RESET}"
 
 # ── Set commit identity ────────────────────────────────────────────

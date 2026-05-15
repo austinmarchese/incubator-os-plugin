@@ -201,7 +201,12 @@ set /p TOKEN=<"%USERPROFILE%\.incubator-os\token"
 echo password=%TOKEN%
 "@ | Set-Content -Path $HelperPath -Encoding ASCII
 
-git config --global "credential.https://github.com/austinmarchese.helper" "`"$HelperPath`""
+# Reset the helper chain for this URL scope so Git Credential Manager
+# (bundled with Git for Windows) doesn't intercept with a GitHub login popup.
+# `helper = ""` clears inherited helpers for the URL; the second add registers ours.
+git config --global --unset-all "credential.https://github.com/austinmarchese.helper" 2>$null
+git config --global --add "credential.https://github.com/austinmarchese.helper" ""
+git config --global --add "credential.https://github.com/austinmarchese.helper" "`"$HelperPath`""
 
 # ── Clone repo ─────────────────────────────────────────────────────
 New-Item -ItemType Directory -Force -Path $WorkspaceBase | Out-Null
