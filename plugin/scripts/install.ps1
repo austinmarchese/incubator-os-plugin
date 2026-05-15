@@ -244,12 +244,13 @@ Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/token (ACL: current user only)${
 # GitHub" dialog. A POSIX sh script runs cleanly (Git for Windows
 # ships with bash).
 $HelperPath = Join-Path $IncOsDir "credential-helper.sh"
-$TokenPathSh = ($TokenFile -replace '\\', '/')
+# Use $HOME (msys sh resolves it to %USERPROFILE%) to match install.sh exactly.
+# Avoids baked-in Windows paths that msys may interpret inconsistently.
 $helperBody = @"
 #!/bin/sh
 [ "`$1" = "get" ] || exit 0
 echo "username=austinmarchese"
-echo "password=`$(cat "$TokenPathSh")"
+echo "password=`$(cat "`$HOME/.incubator-os/token")"
 "@
 $helperBodyLf = $helperBody -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($HelperPath, $helperBodyLf, [System.Text.UTF8Encoding]::new($false))
@@ -291,11 +292,21 @@ if (Test-Path (Join-Path $WorkspaceDir ".git")) {
     Write-Host "  ${YELLOW}! workspace on detached HEAD — leaving existing state intact${RESET}"
   }
 } else {
+  # Stream clone output so the user can see progress (and any auth
+  # prompts or stalls). Disable git's interactive prompts via env var
+  # so a bad credential helper can't block on stdin forever.
+  $env:GIT_TERMINAL_PROMPT = "0"
   & {
     $ErrorActionPreference = "Continue"
-    git clone $Resp.repo_url $WorkspaceDir 2>&1 | Out-Null
+    git clone --progress $Resp.repo_url $WorkspaceDir 2>&1 | ForEach-Object { Write-Host "    $_" }
   }
-  Write-Host "  ${GREEN}✓ Cloned to $WorkspaceDir${RESET}"
+  Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+  if (Test-Path (Join-Path $WorkspaceDir ".git")) {
+    Write-Host "  ${GREEN}✓ Cloned to $WorkspaceDir${RESET}"
+  } else {
+    Write-Host "  ${RED}✗ Clone failed. See output above.${RESET}"
+    Track-Failure "git clone of $($Resp.repo_url) failed - see install output"
+  }
 }
 
 git -C $WorkspaceDir config user.name $Resp.name
