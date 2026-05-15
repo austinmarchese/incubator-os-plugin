@@ -1,0 +1,69 @@
+{
+  "name": "incubator-os",
+  "version": "0.1.0",
+  "description": "Incubator OS — content workspace skills for Claude Code.",
+  "homepage": "https://incubator-os.com",
+  "repository": "https://github.com/austinmarchese/incubator-os-plugin",
+  "license": "MIT",
+  "keywords": [
+    "incubator",
+    "content",
+    "skills",
+    "claude-code"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sweep.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/plugin-update.mjs",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-behind.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "day=$(date +%u); if [ \"$day\" = \"2\" ] || [ \"$day\" = \"5\" ]; then printf '{\"systemMessage\":\"Run /inc-os:improve to review your sessions.\"}'; fi",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/flush.mjs",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/plugin-update.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/emit.mjs",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "incubator-os",
+  "owner": {
+    "name": "Austin Marchese",
+    "email": "austin@theincubator.xyz"
+  },
+  "metadata": {
+    "description": "Curated content workspace skills for Incubator OS clients.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "incubator-os",
+      "source": "./plugin",
+      "description": "Incubator OS — content workspace skills.",
+      "version": "0.1.0",
+      "category": "productivity",
+      "tags": [
+        "incubator",
+        "content",
+        "skills"
+      ]
+    }
+  ]
+}

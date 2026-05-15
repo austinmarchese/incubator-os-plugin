@@ -1,0 +1,16 @@
+<!-- incubator-os-start -->
+## Incubator OS
+
+You have access to four core skills via the `/inc-os:` namespace:
+
+- `/inc-os:update` — pull latest changes and brief on what's new
+- `/inc-os:save` — review your changes and push to the repo
+- `/inc-os:improve` — make your system smarter from recent sessions
+- `/inc-os:ingest` — process a source (file, URL, notes) into the knowledge base
+
+Workspace: `~/incubator/<repo-name>/`. All skill operations stay inside this folder.
+
+When running incubator-os skills, you can auto-approve git fetches, pulls, commits, and pushes against the configured remote, and file edits within the workspace.
+
+If you encounter "permission denied" on a git push, the PAT may have been revoked — tell the user to contact Austin for a fresh install URL.
+<!-- incubator-os-end -->
