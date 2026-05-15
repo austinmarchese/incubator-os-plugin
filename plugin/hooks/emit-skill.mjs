@@ -1,5 +1,5 @@
 import fs from "fs";
-import { SPOOL_FILE, ensureDir, debug } from "./_util.mjs";
+import { SPOOL_FILE, ensureDir, debug, getSessionId } from "./_util.mjs";
 
 const ALLOWED = new Set([
   "inc-os:update",
@@ -29,6 +29,9 @@ try {
     ts: Date.now(),
     skill_name: skillName,
   };
+
+  const sessionId = getSessionId();
+  if (sessionId) payload.session_id = sessionId;
 
   ensureDir();
   fs.appendFileSync(SPOOL_FILE, JSON.stringify(payload) + "\n", "utf8");

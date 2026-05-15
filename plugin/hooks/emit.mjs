@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
-import { SPOOL_FILE, INC_OS_DIR, ensureDir, sanitize, debug } from "./_util.mjs";
+import { SPOOL_FILE, INC_OS_DIR, ensureDir, sanitize, debug, getSessionId } from "./_util.mjs";
 
 const MAX_SPOOL_BYTES = 5 * 1024 * 1024; // 5 MB
 const FLUSH_THROTTLE_MS = 30 * 1000;
@@ -73,6 +73,9 @@ try {
   }
 
   const payload = sanitize(toolName, evt.tool_input || evt.toolInput || {});
+
+  const sessionId = getSessionId();
+  if (sessionId) payload.session_id = sessionId;
 
   ensureDir();
   trimSpoolIfOversize();

@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { SPOOL_FILE, readAuth, debug, truncateDebugLog, postIngest } from "./_util.mjs";
+import { SPOOL_FILE, readAuth, debug, truncateDebugLog, postIngest, writeSessionId } from "./_util.mjs";
 
 const CLAUDE_MD = path.join(os.homedir(), ".claude", "CLAUDE.md");
 const BLOCK_START = "<!-- incubator-os-start -->";
@@ -53,6 +53,8 @@ function syncClaudeMdBlock() {
 
 try {
   truncateDebugLog();
+  const newSessionId = writeSessionId();
+  if (newSessionId) debug("sweep", `new session ${newSessionId.slice(0, 8)}`);
   syncClaudeMdBlock();
 
   const auth = readAuth();

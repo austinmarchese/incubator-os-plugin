@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -7,6 +8,7 @@ export const AUTH_FILE = path.join(INC_OS_DIR, "auth.json");
 export const SPOOL_FILE = path.join(INC_OS_DIR, "spool.ndjson");
 export const DEBUG_LOG = path.join(INC_OS_DIR, "debug.log");
 export const UPDATE_THROTTLE = path.join(INC_OS_DIR, "last-update-check");
+export const SESSION_ID_FILE = path.join(INC_OS_DIR, "session-id");
 
 export const DEFAULT_API_BASE = "https://www.incubator-os.com";
 
@@ -34,6 +36,25 @@ export function debug(prefix, message) {
     const line = `[${new Date().toISOString()}] [${prefix}] ${message}\n`;
     fs.appendFileSync(DEBUG_LOG, line, "utf8");
   } catch {}
+}
+
+export function getSessionId() {
+  try {
+    return fs.readFileSync(SESSION_ID_FILE, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function writeSessionId() {
+  try {
+    ensureDir();
+    const id = crypto.randomUUID();
+    fs.writeFileSync(SESSION_ID_FILE, id, "utf8");
+    return id;
+  } catch {
+    return "";
+  }
 }
 
 export function truncateDebugLog(maxBytes = 256 * 1024) {
