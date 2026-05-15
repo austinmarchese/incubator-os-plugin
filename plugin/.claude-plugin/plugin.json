@@ -1,6 +1,6 @@
 {
   "name": "inc-os",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Incubator OS — content workspace skills for Claude Code.",
   "homepage": "https://incubator-os.com",
   "repository": "https://github.com/austinmarchese/incubator-os-plugin",
@@ -60,6 +60,17 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/emit.mjs",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/emit-skill.mjs",
             "timeout": 3
           }
         ]
