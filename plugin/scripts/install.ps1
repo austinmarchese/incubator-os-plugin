@@ -282,22 +282,13 @@ if (Get-Command claude -ErrorAction SilentlyContinue) {
   Track-Failure "frontend-design plugin (claude CLI not on PATH - rerun in a new shell)"
 }
 
-# ── Inject CLAUDE.md block ─────────────────────────────────────────
+# ── Ensure CLAUDE.md exists ────────────────────────────────────────
+# Block content is injected by sweep.mjs on first SessionStart (one source of truth).
+# Matches install.sh behavior; avoids PS Get-Content -Raw array quirks.
 $ClaudeMd = Join-Path $HOME ".claude\CLAUDE.md"
 New-Item -ItemType Directory -Force -Path (Split-Path $ClaudeMd) | Out-Null
 if (-not (Test-Path $ClaudeMd)) { New-Item -ItemType File -Path $ClaudeMd | Out-Null }
-
-$BlockFile = Get-ChildItem -Path (Join-Path $HOME ".claude\plugins") -Filter "claude-md-block.txt" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like "*incubator-os*" } | Select-Object -First 1
-
-if ($BlockFile) {
-  $BlockContent = Get-Content $BlockFile.FullName -Raw
-  $Existing = Get-Content $ClaudeMd -Raw
-  $Cleaned = $Existing -replace '(?s)<!-- incubator-os-start -->.*?<!-- incubator-os-end -->', ''
-  $NewContent = $Cleaned.TrimEnd() + "`n`n" + $BlockContent + "`n"
-  $TempFile = "$ClaudeMd.tmp"
-  Set-Content -Path $TempFile -Value $NewContent -Encoding UTF8
-  Move-Item -Force $TempFile $ClaudeMd
-}
+Write-Host "  + Ensured ~/.claude/CLAUDE.md exists (block injected via sweep.mjs)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
