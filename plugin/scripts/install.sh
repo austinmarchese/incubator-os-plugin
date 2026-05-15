@@ -11,8 +11,10 @@ API_BASE="${INCUBATOR_OS_API_BASE:-https://incubator-os.com}"
 INC_OS_DIR="$HOME/.incubator-os"
 WORKSPACE_BASE="$HOME/incubator"
 
-# Colors
-CYAN='\033[38;2;34;211;238m'
+# Brand colors (theincubator.xyz)
+BRAND_ORANGE='\033[38;2;166;68;34m'      # #a64422
+BRAND_ACCENT='\033[38;2;204;119;90m'     # #cc775a
+BRAND_CREAM='\033[38;2;243;237;226m'     # #f3ede2
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -21,9 +23,9 @@ DIM='\033[2m'
 RESET='\033[0m'
 
 echo ""
-echo -e "${CYAN}  ╭─────────────────────────────────────────╮${RESET}"
-echo -e "${CYAN}  │  Incubator OS — Your AI Workspace        │${RESET}"
-echo -e "${CYAN}  ╰─────────────────────────────────────────╯${RESET}"
+echo -e "${BRAND_ORANGE}  ╭─────────────────────────────────────────╮${RESET}"
+echo -e "${BRAND_ORANGE}  │  Incubator OS — Your AI Workspace        │${RESET}"
+echo -e "${BRAND_ORANGE}  ╰─────────────────────────────────────────╯${RESET}"
 echo ""
 
 if [ -z "$INSTALL_TOKEN" ] || [ "$INSTALL_TOKEN" = "__INSTALL_TOKEN_PLACEHOLDER__" ]; then
@@ -32,7 +34,7 @@ if [ -z "$INSTALL_TOKEN" ] || [ "$INSTALL_TOKEN" = "__INSTALL_TOKEN_PLACEHOLDER_
 fi
 
 # ── [1/4] Dependencies ─────────────────────────────────────────────
-echo -e "${BOLD}  [1/4] Installing dependencies...${RESET}"
+echo -e "${BRAND_ACCENT}  [1/4]${RESET}${BOLD} Installing dependencies...${RESET}"
 echo ""
 
 # ── Detect OS ──────────────────────────────────────────────────────
@@ -114,7 +116,7 @@ fi
 echo ""
 
 # ── [2/4] Workspace credentials ────────────────────────────────────
-echo -e "${BOLD}  [2/4] Setting up your workspace credentials...${RESET}"
+echo -e "${BRAND_ACCENT}  [2/4]${RESET}${BOLD} Setting up your workspace credentials...${RESET}"
 echo ""
 
 # ── Partial-state recovery: skip credential fetch if auth.json valid ──
@@ -195,7 +197,7 @@ echo -e "  ${GREEN}✓ Set commit identity on workspace: $NAME <$EMAIL>${RESET}"
 echo ""
 
 # ── [3/4] Clone workspace ──────────────────────────────────────────
-echo -e "${BOLD}  [3/4] Cloning your workspace...${RESET}"
+echo -e "${BRAND_ACCENT}  [3/4]${RESET}${BOLD} Cloning your workspace...${RESET}"
 echo ""
 
 mkdir -p "$WORKSPACE_BASE"
@@ -223,7 +225,7 @@ fi
 echo ""
 
 # ── [4/4] Install plugin ───────────────────────────────────────────
-echo -e "${BOLD}  [4/4] Installing the Claude Code plugin...${RESET}"
+echo -e "${BRAND_ACCENT}  [4/4]${RESET}${BOLD} Installing the Claude Code plugin...${RESET}"
 echo ""
 
 # Idempotent re-runs: remove existing entries first
@@ -235,6 +237,12 @@ echo -e "  ${GREEN}✓ Added marketplace: austinmarchese/incubator-os-plugin${RE
 claude plugin install inc-os@incubator-os
 echo -e "  ${GREEN}✓ Installed plugin: inc-os@incubator-os${RESET}"
 
+# Install Anthropic's frontend-design plugin (UI/web tooling)
+echo -e "  ${DIM}Installing frontend-design from Anthropic's plugin marketplace...${RESET}"
+claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
+claude plugin install frontend-design@claude-plugins-official 2>/dev/null || true
+echo -e "  ${GREEN}✓ Installed plugin: frontend-design@claude-plugins-official${RESET}"
+
 # ── Ensure CLAUDE.md exists ────────────────────────────────────────
 # Block content is injected by sweep.mjs on first SessionStart (one source of truth).
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
@@ -245,21 +253,26 @@ echo -e "  ${GREEN}✓ Ensured ~/.claude/CLAUDE.md exists (block injected via sw
 echo ""
 
 # ── Done ───────────────────────────────────────────────────────────
-echo -e "${CYAN}  ╭─────────────────────────────────────────╮${RESET}"
-echo -e "${CYAN}  │                                          │${RESET}"
-echo -e "${CYAN}  │  You're all set!                         │${RESET}"
-echo -e "${CYAN}  │                                          │${RESET}"
-echo -e "${CYAN}  │  Open your workspace:                    │${RESET}"
-echo -e "${CYAN}  │    ~/incubator/$REPO_NAME$(printf '%*s' $((26 - ${#REPO_NAME})) '')│${RESET}"
-echo -e "${CYAN}  │                                          │${RESET}"
-echo -e "${CYAN}  │  Try one of:                             │${RESET}"
-echo -e "${CYAN}  │    /inc-os:update                        │${RESET}"
-echo -e "${CYAN}  │    /inc-os:save                          │${RESET}"
-echo -e "${CYAN}  │    /inc-os:improve                       │${RESET}"
-echo -e "${CYAN}  │    /inc-os:ingest                        │${RESET}"
-echo -e "${CYAN}  │                                          │${RESET}"
-echo -e "${CYAN}  ╰─────────────────────────────────────────╯${RESET}"
 echo ""
-echo -e "  ${DIM}Note: on first session, Claude Code may show a one-time approval${RESET}"
-echo -e "  ${DIM}prompt for the Incubator OS plugin. Approve it when it appears.${RESET}"
+echo -e "${BRAND_ORANGE}  ╭──────────────────────────────────────────────────────╮${RESET}"
+echo -e "${BRAND_ORANGE}  │                                                      │${RESET}"
+echo -e "${BRAND_ORANGE}  │  ${BOLD}You're all set!${RESET}${BRAND_ORANGE}                                     │${RESET}"
+echo -e "${BRAND_ORANGE}  │                                                      │${RESET}"
+echo -e "${BRAND_ORANGE}  ╰──────────────────────────────────────────────────────╯${RESET}"
+echo ""
+echo -e "${BOLD}  Get started in Claude Desktop:${RESET}"
+echo ""
+echo -e "  ${BRAND_ACCENT}1.${RESET} Open the ${BOLD}Claude${RESET} desktop app"
+echo -e "  ${BRAND_ACCENT}2.${RESET} Switch to the ${BOLD}Claude Code${RESET} toggle"
+echo -e "  ${BRAND_ACCENT}3.${RESET} Select this folder when prompted:"
+echo -e "       ${BOLD}$WORKSPACE_DIR${RESET}"
+echo -e "  ${BRAND_ACCENT}4.${RESET} Try one of these commands:"
+echo ""
+echo -e "       ${BOLD}/inc-os:update${RESET}   — pull latest and brief on changes"
+echo -e "       ${BOLD}/inc-os:save${RESET}     — review and push your work"
+echo -e "       ${BOLD}/inc-os:improve${RESET}  — make your system smarter"
+echo -e "       ${BOLD}/inc-os:ingest${RESET}   — process a source into the KB"
+echo ""
+echo -e "  ${DIM}Note: on first session, Claude Code may show a one-time${RESET}"
+echo -e "  ${DIM}approval prompt for the Incubator OS plugin. Approve it.${RESET}"
 echo ""

@@ -163,6 +163,12 @@ claude plugin marketplace remove incubator-os 2>$null
 claude plugin marketplace add austinmarchese/incubator-os-plugin
 claude plugin install "inc-os@incubator-os"
 
+# Install Anthropic's frontend-design plugin (UI/web tooling)
+Write-Host "  Installing frontend-design from Anthropic's plugin marketplace..."
+claude plugin marketplace add anthropics/claude-plugins-official 2>$null
+claude plugin install "frontend-design@claude-plugins-official" 2>$null
+Write-Host "  + Installed plugin: frontend-design@claude-plugins-official" -ForegroundColor Green
+
 # ── Inject CLAUDE.md block ─────────────────────────────────────────
 $ClaudeMd = Join-Path $HOME ".claude\CLAUDE.md"
 New-Item -ItemType Directory -Force -Path (Split-Path $ClaudeMd) | Out-Null
@@ -181,15 +187,37 @@ if ($BlockFile) {
 }
 
 Write-Host ""
-Write-Host "  Install complete" -ForegroundColor Green
+Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
+Write-Host "  |                                                         |" -ForegroundColor DarkRed
+Write-Host "  |  You're all set!                                        |" -ForegroundColor DarkRed
+Write-Host "  |                                                         |" -ForegroundColor DarkRed
+Write-Host "  +---------------------------------------------------------+" -ForegroundColor DarkRed
 Write-Host ""
-Write-Host "  Next step:"
-Write-Host "  Open Claude Code at this folder:"
+Write-Host "  Get started in Claude Desktop:" -ForegroundColor White
 Write-Host ""
-Write-Host "    $WorkspaceDir" -ForegroundColor White
+Write-Host "  1." -NoNewline -ForegroundColor Yellow
+Write-Host " Open the " -NoNewline
+Write-Host "Claude" -NoNewline -ForegroundColor White
+Write-Host " desktop app"
+Write-Host "  2." -NoNewline -ForegroundColor Yellow
+Write-Host " Switch to the " -NoNewline
+Write-Host "Claude Code" -NoNewline -ForegroundColor White
+Write-Host " toggle"
+Write-Host "  3." -NoNewline -ForegroundColor Yellow
+Write-Host " Select this folder when prompted:"
+Write-Host "       $WorkspaceDir" -ForegroundColor White
+Write-Host "  4." -NoNewline -ForegroundColor Yellow
+Write-Host " Try one of these commands:"
 Write-Host ""
-Write-Host "  Try: /inc-os:update" -ForegroundColor White
+Write-Host "       /inc-os:update" -NoNewline -ForegroundColor White
+Write-Host "   -- pull latest and brief on changes"
+Write-Host "       /inc-os:save" -NoNewline -ForegroundColor White
+Write-Host "     -- review and push your work"
+Write-Host "       /inc-os:improve" -NoNewline -ForegroundColor White
+Write-Host "  -- make your system smarter"
+Write-Host "       /inc-os:ingest" -NoNewline -ForegroundColor White
+Write-Host "   -- process a source into the KB"
 Write-Host ""
-Write-Host "  Note: on first session, Claude Code may show a one-time approval"
-Write-Host "  prompt for the Incubator OS plugin. Approve it when it appears."
+Write-Host "  Note: on first session, Claude Code may show a one-time" -ForegroundColor DarkGray
+Write-Host "  approval prompt for the Incubator OS plugin. Approve it." -ForegroundColor DarkGray
 Write-Host ""
