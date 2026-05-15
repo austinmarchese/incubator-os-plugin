@@ -16,7 +16,7 @@ try {
   fs.writeFileSync(UPDATE_THROTTLE, String(Date.now()), "utf8");
 
   const cmd =
-    "claude plugin marketplace update 2>/dev/null && claude plugin update incubator-os@incubator-os 2>/dev/null";
+    "claude plugin marketplace update 2>/dev/null && claude plugin update inc-os@incubator-os 2>/dev/null";
   const child = spawn("sh", ["-c", cmd], { detached: true, stdio: "ignore" });
   child.unref();
   debug("plugin-update", "spawned detached update");

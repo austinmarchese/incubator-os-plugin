@@ -31,6 +31,39 @@ function Ensure-Cmd {
 Ensure-Cmd git "Git.Git"
 Ensure-Cmd node "OpenJS.NodeJS.LTS"
 
+# ── Ingest dependencies (best-effort; non-fatal) ───────────────────
+# yt-dlp: used by scripts/fetch_youtube_transcript.py for title/channel metadata
+if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
+  try {
+    winget install --id yt-dlp.yt-dlp --accept-source-agreements --accept-package-agreements --silent
+    Write-Host "  + yt-dlp (installed)" -ForegroundColor Green
+  } catch {
+    Write-Host "  ! yt-dlp not available - YouTube transcript metadata will fall back to video ID only" -ForegroundColor Yellow
+  }
+} else {
+  Write-Host "  + yt-dlp (already installed)" -ForegroundColor Green
+}
+
+# youtube-transcript-api: Python package used by scripts/fetch_youtube_transcript.py
+$PyCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } `
+         elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } `
+         else { $null }
+if ($PyCmd) {
+  $HasApi = & $PyCmd -c "import youtube_transcript_api" 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "  + youtube-transcript-api (already installed)" -ForegroundColor Green
+  } else {
+    try {
+      & $PyCmd -m pip install --quiet youtube-transcript-api 2>$null
+      Write-Host "  + youtube-transcript-api (installed)" -ForegroundColor Green
+    } catch {
+      Write-Host "  ! youtube-transcript-api not installed - run: pip install youtube-transcript-api" -ForegroundColor Yellow
+    }
+  }
+} else {
+  Write-Host "  ! python not found - YouTube ingest requires manual setup (see scripts/fetch_youtube_transcript.py)" -ForegroundColor Yellow
+}
+
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Write-Host "  Installing Claude Code..."
   npm install -g @anthropic-ai/claude-code
@@ -128,7 +161,7 @@ Write-Host "  Installing the Incubator OS plugin..."
 
 claude plugin marketplace remove incubator-os 2>$null
 claude plugin marketplace add austinmarchese/incubator-os-plugin
-claude plugin install "incubator-os@incubator-os"
+claude plugin install "inc-os@incubator-os"
 
 # ── Inject CLAUDE.md block ─────────────────────────────────────────
 $ClaudeMd = Join-Path $HOME ".claude\CLAUDE.md"

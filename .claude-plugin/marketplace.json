@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "incubator-os",
+      "name": "inc-os",
       "source": "./plugin",
       "description": "Incubator OS — content workspace skills.",
       "version": "0.1.0",

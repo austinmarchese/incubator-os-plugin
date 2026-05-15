@@ -188,11 +188,17 @@ Client material stays in `clients/{slug}/`. **Do not promote client-identifying 
 
 ## Setup
 
-- `scripts/fetch_youtube_transcript.py` requires `youtube-transcript-api` (Python) and `yt-dlp` (for title/channel metadata). Install once:
+- `scripts/fetch_youtube_transcript.py` is a **per-repo script** that lives in the client's content workspace (not in the plugin). It requires `youtube-transcript-api` (Python) and `yt-dlp` (for title/channel metadata).
+
+  The plugin install script (`install.sh` / `install.ps1`) installs both dependencies automatically as a best-effort step. If they are missing, run:
   ```bash
   pip install youtube-transcript-api
-  brew install yt-dlp
+  brew install yt-dlp   # macOS; or: pip install yt-dlp
   ```
+
+  If `scripts/fetch_youtube_transcript.py` is missing from your workspace (e.g., a newly provisioned repo), the YouTube pipeline will not work. In that case, tell the user: "The YouTube transcript script is not present in this workspace. Ask Austin to add `scripts/fetch_youtube_transcript.py` to your repo, or fall back to fetching the video page (title + description only) via WebFetch."
+
+  If `yt-dlp` is missing but `youtube-transcript-api` is present, the transcript still fetches successfully; only the title and channel metadata fall back to the raw video ID.
 
 ## Learnings
 
