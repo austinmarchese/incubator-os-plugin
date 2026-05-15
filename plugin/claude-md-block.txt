@@ -3,10 +3,10 @@
 
 You have access to four core skills via the `/inc-os:` namespace:
 
-- `/inc-os:update` — pull latest changes and brief on what's new
-- `/inc-os:save` — review your changes and push to the repo
+- `/inc-os:update-system` — pull latest changes and brief on what's new
+- `/inc-os:save-system` — save your work (review local changes, push to the repo)
 - `/inc-os:improve-system` — improve your system from recent sessions
-- `/inc-os:ingest` — process a source (file, URL, notes) into the knowledge base
+- `/inc-os:add-new-resource` — add a new resource (file, URL, notes) to your knowledge base
 
 Workspace: `~/incubator/<repo-name>/`. All skill operations stay inside this folder.
 

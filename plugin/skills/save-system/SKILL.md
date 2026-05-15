@@ -1,9 +1,9 @@
 ---
-name: inc-os:save
-description: "Review local changes, walk the user through any merge conflicts, then push to origin/main."
+name: inc-os:save-system
+description: "Save your work to the system. Review local changes, walk the user through any merge conflicts, then push to origin/main."
 ---
 
-# /inc-os:save
+# /inc-os:save-system
 
 Review local changes against main, flag anything risky, then sync with origin/main and push.
 
@@ -179,6 +179,6 @@ Changes:
 
 ## What this skill does NOT do
 
-- Does not pull from main without committing first. Use `/inc-os:update` for a pure sync.
+- Does not pull from main without committing first. Use `/inc-os:update-system` for a pure sync.
 - Does not run tests or builds.
 - Does not force-push or rewrite history.

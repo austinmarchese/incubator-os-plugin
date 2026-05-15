@@ -1,9 +1,9 @@
 ---
-name: inc-os:ingest
-description: Ingest a raw source (article, transcript, notes, YouTube URL, or attachment) into the right place — wiki/ for stable knowledge, clients/{slug}/ for client-specific material — then summarize and cross-reference.
+name: inc-os:add-new-resource
+description: Add a new resource to your system. Takes a raw source (article, transcript, notes, YouTube URL, or attachment) and routes it to the right place — wiki/ for stable knowledge, clients/{slug}/ for client-specific material — then summarizes and cross-references.
 ---
 
-# /inc-os:ingest
+# /inc-os:add-new-resource
 
 Take an article, transcript, notes file, URL, attachment, or YouTube video and route it into the right home in this repo. Then add a `## Summary` block, extract key entities, and cross-reference with `[[wikilinks]]` where useful.
 
@@ -45,7 +45,7 @@ When the input is a YouTube URL:
    ```bash
    bash scripts/setup.sh
    ```
-   `/inc-os:update` will install both `yt-dlp` and `youtube-transcript-api`. Then continue.
+   `/inc-os:update-system` will install both `yt-dlp` and `youtube-transcript-api`. Then continue.
 
 2. Fetch the transcript and metadata:
    ```bash
@@ -82,7 +82,7 @@ Pick the sub-folder:
 | Hogan 360 PDF | n/a | `clients/{slug}/discovery/` |
 | Session notes | n/a | `clients/{slug}/sessions/YYYY-MM-DD.md` |
 
-For a YouTube transcript of an advisor (e.g., a talk by someone whose frameworks you're cloning into `wiki/consultants/`), default destination is `wiki/consultants/sources/{advisor-slug}/transcripts/`. Sources live in a sibling `sources/` tree, NOT in a folder named after the advisor at the same level as advisor `.md` files — the advisor file itself is the single `wiki/consultants/{advisor-slug}.md` per project convention, and `/inc-os:ingest` only globs `wiki/consultants/*.md` so the `sources/` subfolder is correctly ignored. Move the `/tmp/` file into `wiki/consultants/sources/{advisor-slug}/transcripts/`. Create folders if missing.
+For a YouTube transcript of an advisor (e.g., a talk by someone whose frameworks you're cloning into `wiki/consultants/`), default destination is `wiki/consultants/sources/{advisor-slug}/transcripts/`. Sources live in a sibling `sources/` tree, NOT in a folder named after the advisor at the same level as advisor `.md` files — the advisor file itself is the single `wiki/consultants/{advisor-slug}.md` per project convention, and `/inc-os:add-new-resource` only globs `wiki/consultants/*.md` so the `sources/` subfolder is correctly ignored. Move the `/tmp/` file into `wiki/consultants/sources/{advisor-slug}/transcripts/`. Create folders if missing.
 
 Filename: lowercase kebab-case, dated when relevant (`2026-05-12-article-title.md`).
 

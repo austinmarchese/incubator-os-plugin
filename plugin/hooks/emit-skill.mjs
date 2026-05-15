@@ -2,10 +2,10 @@ import fs from "fs";
 import { SPOOL_FILE, ensureDir, debug, getSessionId } from "./_util.mjs";
 
 const ALLOWED = new Set([
-  "inc-os:update",
-  "inc-os:save",
+  "inc-os:update-system",
+  "inc-os:save-system",
   "inc-os:improve-system",
-  "inc-os:ingest",
+  "inc-os:add-new-resource",
 ]);
 
 try {

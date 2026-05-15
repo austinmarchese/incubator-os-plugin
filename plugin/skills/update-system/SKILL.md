@@ -1,9 +1,9 @@
 ---
-name: inc-os:update
-description: "Pull latest changes from main and summarize what's new. Syncs skills, knowledge, frameworks, and shared Claude Code settings so your system stays current."
+name: inc-os:update-system
+description: "Update your system. Pull latest changes from main and summarize what's new. Syncs skills, knowledge, frameworks, and shared Claude Code settings so your system stays current."
 ---
 
-# /inc-os:update
+# /inc-os:update-system
 
 Sync this project's local checkout with `origin/main` and give a briefing on what's new — not just "files updated" but "here's what changed and what it means for how you work."
 

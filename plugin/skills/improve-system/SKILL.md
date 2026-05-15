@@ -3,7 +3,7 @@ name: inc-os:improve-system
 description: "Improve your system. Improves skills from iteration, captures experiences, reviews session history for knowledge, audits for rot, and sets up foundation content. Routes automatically based on context."
 ---
 
-# /inc-os:improve
+# /inc-os:improve-system
 
 Make your entire system smarter based on what just happened. One skill, five modes. The model determines which mode based on conversation context, or you can specify.
 
@@ -193,7 +193,7 @@ Check if this experience is relevant to any active projects in the workspace. If
 
 #### Step 6: Ingest into wiki
 
-After writing all experience entries, automatically run the `/inc-os:ingest` process on each file:
+After writing all experience entries, automatically run the `/inc-os:add-new-resource` process on each file:
 - Add a `## Summary` section with source type, key entities, key concepts, and ingestion date
 - Extract entities and concepts worth tracking in the wiki
 - Create or update wiki pages for substantive new concepts
@@ -446,7 +446,7 @@ After each sub-skill completes, re-run the Step 2 status check. For content-foun
 
 Once foundation is complete, mention that:
 
-- `/inc-os:save` will automatically treat all foundation `wiki_paths` as sensitive (auto-discovered, no manual config).
+- `/inc-os:save-system` will automatically treat all foundation `wiki_paths` as sensitive (auto-discovered, no manual config).
 - Other skills that need foundation context can invoke a foundation sub-skill in "read mode" to load it.
 
 ---

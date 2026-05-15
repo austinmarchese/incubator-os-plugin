@@ -64,7 +64,7 @@ try {
 
   if (behind > 0) {
     const message = {
-      systemMessage: `${behind} commit${behind === 1 ? "" : "s"} behind origin/main. Run /inc-os:update to sync.`,
+      systemMessage: `${behind} commit${behind === 1 ? "" : "s"} behind origin/main. Run /inc-os:update-system to sync.`,
     };
     process.stdout.write(JSON.stringify(message));
     debug("check-behind", `${behind} commits behind`);
