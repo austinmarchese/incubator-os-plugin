@@ -255,7 +255,15 @@ $helperBodyLf = $helperBody -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($HelperPath, $helperBodyLf, [System.Text.UTF8Encoding]::new($false))
 
 $HelperPathGit = $HelperPath -replace '\\', '/'
-git config --global --replace-all "credential.https://github.com/austinmarchese.helper" $HelperPathGit
+
+# Clear any prior entries for this URL scope, then add an empty-string
+# reset (clears inherited helpers like gh's `!gh auth git-credential` or
+# Git Credential Manager from running before ours), then add ours.
+# PS drops empty string args to native exes, so we shell out to cmd.exe
+# for the reset entry — cmd preserves "" correctly.
+git config --global --unset-all "credential.https://github.com/austinmarchese.helper" 2>&1 | Out-Null
+cmd /c 'git config --global --add "credential.https://github.com/austinmarchese.helper" ""' | Out-Null
+git config --global --add "credential.https://github.com/austinmarchese.helper" $HelperPathGit
 Write-Host "  ${GREEN}✓ Configured URL-scoped git credential helper for github.com/austinmarchese/*${RESET}"
 Write-Host "  ${GREEN}✓ Set commit identity on workspace: $($Resp.name) <$($Resp.email)>${RESET}"
 
