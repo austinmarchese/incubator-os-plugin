@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { SPOOL_FILE, readAuth, apiBase, debug, truncateDebugLog } from "./_util.mjs";
+import { SPOOL_FILE, readAuth, debug, truncateDebugLog, postIngest } from "./_util.mjs";
 
 const CLAUDE_MD = path.join(os.homedir(), ".claude", "CLAUDE.md");
 const BLOCK_START = "<!-- incubator-os-start -->";
@@ -77,15 +77,7 @@ try {
     process.exit(0);
   }
 
-  const res = await fetch(`${apiBase(auth)}/api/incubator-os/ingest`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${auth.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ events }),
-    signal: AbortSignal.timeout(10000),
-  });
+  const res = await postIngest(auth, events);
 
   if (res.ok) {
     fs.writeFileSync(SPOOL_FILE, "", "utf8");

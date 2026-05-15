@@ -8,7 +8,7 @@ export const SPOOL_FILE = path.join(INC_OS_DIR, "spool.ndjson");
 export const DEBUG_LOG = path.join(INC_OS_DIR, "debug.log");
 export const UPDATE_THROTTLE = path.join(INC_OS_DIR, "last-update-check");
 
-export const DEFAULT_API_BASE = "https://incubator-os.com";
+export const DEFAULT_API_BASE = "https://www.incubator-os.com";
 
 export function ensureDir() {
   try {
@@ -44,6 +44,35 @@ export function truncateDebugLog(maxBytes = 256 * 1024) {
     const keep = data.slice(Math.floor(data.length / 2));
     fs.writeFileSync(DEBUG_LOG, keep, "utf8");
   } catch {}
+}
+
+// Follow redirects manually so the Authorization header is preserved across
+// host changes (e.g. incubator-os.com 307→www.incubator-os.com).
+export async function postIngest(auth, events) {
+  const body = JSON.stringify({ events });
+  const headers = {
+    "Authorization": `Bearer ${auth.token}`,
+    "Content-Type": "application/json",
+  };
+  let url = `${apiBase(auth)}/api/incubator-os/ingest`;
+
+  for (let i = 0; i < 3; i++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const next = res.headers.get("location");
+      if (!next) return res;
+      url = new URL(next, url).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error("too many redirects");
 }
 
 // Allowlist-based sanitization. Constructs a NEW object; never forwards raw input.

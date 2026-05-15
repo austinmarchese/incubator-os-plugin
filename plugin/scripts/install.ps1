@@ -6,7 +6,7 @@
 $ErrorActionPreference = "Stop"
 
 $InstallToken = "__INSTALL_TOKEN_PLACEHOLDER__"
-$ApiBase = if ($env:INCUBATOR_OS_API_BASE) { $env:INCUBATOR_OS_API_BASE } else { "https://incubator-os.com" }
+$ApiBase = if ($env:INCUBATOR_OS_API_BASE) { $env:INCUBATOR_OS_API_BASE } else { "https://www.incubator-os.com" }
 $IncOsDir = Join-Path $HOME ".incubator-os"
 $WorkspaceBase = Join-Path $HOME "incubator"
 

@@ -1,5 +1,5 @@
 import fs from "fs";
-import { SPOOL_FILE, readAuth, apiBase, debug } from "./_util.mjs";
+import { SPOOL_FILE, readAuth, debug, postIngest } from "./_util.mjs";
 
 try {
   const auth = readAuth();
@@ -24,15 +24,7 @@ try {
     process.exit(0);
   }
 
-  const res = await fetch(`${apiBase(auth)}/api/incubator-os/ingest`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${auth.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ events }),
-    signal: AbortSignal.timeout(10000),
-  });
+  const res = await postIngest(auth, events);
 
   if (res.ok) {
     fs.writeFileSync(SPOOL_FILE, "", "utf8");

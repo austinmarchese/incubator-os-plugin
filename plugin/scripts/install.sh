@@ -7,7 +7,7 @@
 set -e
 
 INSTALL_TOKEN="__INSTALL_TOKEN_PLACEHOLDER__"
-API_BASE="${INCUBATOR_OS_API_BASE:-https://incubator-os.com}"
+API_BASE="${INCUBATOR_OS_API_BASE:-https://www.incubator-os.com}"
 INC_OS_DIR="$HOME/.incubator-os"
 WORKSPACE_BASE="$HOME/incubator"
 
