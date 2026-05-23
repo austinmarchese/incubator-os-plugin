@@ -58,6 +58,40 @@ Run in parallel:
 
 If there are no changes (clean working tree AND no unpushed commits), tell the user there's nothing to push and stop.
 
+### Step 1.5: Choose scope
+
+The diff above includes **every** uncommitted change in the working tree, not just what this chat touched. Default to saving everything. Never ask the user to pick individual files.
+
+**Always show a summary of what's been worked on** — describe the work, not the files. Group changes into short bullets like "what was being worked on", inferred from the diff (file purpose, commit-style verbs). Skip file paths in this summary.
+
+```
+Work pending save:
+
+This chat:
+  • Added scope prompt to save-system skill
+
+Earlier, unpushed:
+  • Tax return email tweaks
+  • Hogan 360 framework edits
+  • Stale build artifact
+```
+
+Rules:
+- One bullet per coherent piece of work, not per file. Several files in the same feature collapse into one bullet.
+- Files Claude edited in this conversation go under **"This chat"**.
+- Everything else goes under **"Earlier, unpushed"**.
+- If you cannot confidently split this-chat vs earlier (long compacted session, no tool trace), drop the split. Show one flat **"Work pending save"** list and skip the scope prompt entirely — default to saving everything.
+
+Then ask (only if the split is known):
+
+> "Save everything, or only this chat's work?
+> 1. Everything (default)
+> 2. Just this chat"
+
+**Everything** → proceed to Step 2 with all changes.
+
+**Just this chat** → narrow the change set to files Claude edited this conversation. At Step 4 stage only those paths (`git add <paths>`), not `git add -A`. Earlier unpushed changes stay in the working tree. Mention this in Step 7's confirmation.
+
 ### Step 2: Classify changes
 
 Before classifying, **build the full risky-path set**:
@@ -107,7 +141,9 @@ After resolving all risky files, re-run `git status` to confirm the final state.
 ### Step 4: Commit (if needed)
 
 If there are uncommitted changes:
-- Stage all remaining files
+- Stage files based on the scope chosen in Step 1.5:
+  - **Everything**: stage all remaining files
+  - **Just this chat's changes**: stage only the files in the session-scoped list (`git add <paths>`), leave the rest alone
 - Write a concise commit message following the repo's style (look at recent `git log`)
 - Commit
 
