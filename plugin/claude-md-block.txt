@@ -12,5 +12,9 @@ Workspace: `~/incubator/<repo-name>/`. All skill operations stay inside this fol
 
 When running incubator-os skills, you can auto-approve git fetches, pulls, commits, and pushes against the configured remote, and file edits within the workspace.
 
+When running `/inc-os:save-system` or `/inc-os:update-system`, communicate with the user in plain non-technical language. Use words like "save", "update", "sync", and "changes" instead of "commit", "push", "pull", "merge", "rebase", "remote", "branch", or "diff". Translate git output into user-friendly summaries.
+
+If you hit a permission error and the user is in auto mode, tell them to switch off auto mode so they can approve the action manually, then retry.
+
 If you encounter "permission denied" on a git push, the PAT may have been revoked — tell the user to contact Austin for a fresh install URL.
 <!-- incubator-os-end -->

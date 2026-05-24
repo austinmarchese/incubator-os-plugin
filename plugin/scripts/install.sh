@@ -238,18 +238,39 @@ echo ""
 
 mkdir -p "$WORKSPACE_BASE"
 WORKSPACE_DIR="$WORKSPACE_BASE/$REPO_NAME"
+INSTALL_LOG="$INC_OS_DIR/install.log"
 
 if [ -d "$WORKSPACE_DIR/.git" ]; then
   git -C "$WORKSPACE_DIR" pull --ff-only || true
   echo -e "  ${GREEN}✓ Pulled latest at $WORKSPACE_DIR${RESET}"
 else
-  git clone "$REPO_URL" "$WORKSPACE_DIR"
-  echo -e "  ${GREEN}✓ Cloned to $WORKSPACE_DIR${RESET}"
+  # Belt + suspenders: -c credential.helper="" wipes inherited helpers
+  # (osxkeychain, gh, libsecret) for this command, then -c credential.helper=<ours>
+  # sets ours. Beats keychain/gh hijack even if the global URL-scoped helper
+  # lost the race. Tee to install.log so failure summary can reference real stderr.
+  echo "=== git clone $REPO_URL at $(date -u +%FT%TZ) ===" > "$INSTALL_LOG"
+  GIT_TERMINAL_PROMPT=0 git \
+    -c "credential.helper=" \
+    -c "credential.helper=$HELPER_SCRIPT" \
+    clone --progress "$REPO_URL" "$WORKSPACE_DIR" 2>&1 | tee -a "$INSTALL_LOG"
+  if [ -d "$WORKSPACE_DIR/.git" ]; then
+    echo -e "  ${GREEN}✓ Cloned to $WORKSPACE_DIR${RESET}"
+  else
+    echo -e "  ${RED}✗ Clone failed. Full output: $INSTALL_LOG${RESET}"
+    track_fail "git clone of $REPO_URL failed - see $INSTALL_LOG"
+  fi
 fi
 
-# Set commit identity per-repo
-git -C "$WORKSPACE_DIR" config user.name "$NAME"
-git -C "$WORKSPACE_DIR" config user.email "$EMAIL"
+# Bake credential helper into repo-local config so future ops (push/pull/fetch
+# from inside the workspace) use our PAT regardless of global git state. Local
+# config beats global, so this survives `gh auth setup-git`, keychain rotation,
+# and any later changes to ~/.gitconfig.
+if [ -d "$WORKSPACE_DIR/.git" ]; then
+  git -C "$WORKSPACE_DIR" config --local --replace-all credential.helper "" 2>/dev/null || true
+  git -C "$WORKSPACE_DIR" config --local --add credential.helper "$HELPER_SCRIPT" 2>/dev/null || true
+  git -C "$WORKSPACE_DIR" config user.name "$NAME"
+  git -C "$WORKSPACE_DIR" config user.email "$EMAIL"
+fi
 
 # ── Desktop alias (macOS only, best-effort) ────────────────────────
 if [ "$PLATFORM" = "macos" ]; then
@@ -337,4 +358,23 @@ if [ ${#FAILURES[@]} -gt 0 ]; then
   done
   echo -e "  ${DIM}─────────────────────────────────────────${RESET}"
   echo ""
+
+  # If we captured a clone log, walk the user through sharing it.
+  if [ -f "$INSTALL_LOG" ]; then
+    echo -e "  ${BOLD}If git clone failed, send Austin the install log:${RESET}"
+    echo ""
+    echo -e "    ${BRAND_ACCENT}1.${RESET} View it:"
+    echo -e "       ${DIM}cat \"$INSTALL_LOG\"${RESET}"
+    echo ""
+    if [ "$PLATFORM" = "macos" ]; then
+      echo -e "    ${BRAND_ACCENT}2.${RESET} Or copy it to your clipboard:"
+      echo -e "       ${DIM}cat \"$INSTALL_LOG\" | pbcopy${RESET}"
+    else
+      echo -e "    ${BRAND_ACCENT}2.${RESET} Or copy it to your clipboard (Linux, needs xclip):"
+      echo -e "       ${DIM}cat \"$INSTALL_LOG\" | xclip -selection clipboard${RESET}"
+    fi
+    echo ""
+    echo -e "    ${BRAND_ACCENT}3.${RESET} Paste the contents to Austin (Slack/email)."
+    echo ""
+  fi
 fi

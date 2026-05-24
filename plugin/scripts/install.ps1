@@ -276,6 +276,7 @@ Write-Host ""
 
 New-Item -ItemType Directory -Force -Path $WorkspaceBase | Out-Null
 $WorkspaceDir = Join-Path $WorkspaceBase $RepoName
+$InstallLog = Join-Path $IncOsDir "install.log"
 
 if (Test-Path (Join-Path $WorkspaceDir ".git")) {
   $branch = & {
@@ -296,21 +297,41 @@ if (Test-Path (Join-Path $WorkspaceDir ".git")) {
   # prompts or stalls). Disable git's interactive prompts via env var
   # so a bad credential helper can't block on stdin forever.
   $env:GIT_TERMINAL_PROMPT = "0"
+  # Belt + suspenders: -c credential.helper="" wipes inherited helpers
+  # (GCM, gh) for this command, then -c credential.helper=<ours> sets
+  # ours. Beats GCM even if the global URL-scoped helper lost the race.
+  # Also tee output to install.log so failure summary can reference real stderr.
+  "=== git clone $($Resp.repo_url) at $(Get-Date -Format o) ===" | Out-File -FilePath $InstallLog -Encoding utf8
   & {
     $ErrorActionPreference = "Continue"
-    git clone --progress $Resp.repo_url $WorkspaceDir 2>&1 | ForEach-Object { Write-Host "    $_" }
+    git -c "credential.helper=" `
+        -c "credential.helper=$HelperPathGit" `
+        clone --progress $Resp.repo_url $WorkspaceDir 2>&1 |
+      Tee-Object -FilePath $InstallLog -Append |
+      ForEach-Object { Write-Host "    $_" }
   }
   Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
   if (Test-Path (Join-Path $WorkspaceDir ".git")) {
     Write-Host "  ${GREEN}✓ Cloned to $WorkspaceDir${RESET}"
   } else {
-    Write-Host "  ${RED}✗ Clone failed. See output above.${RESET}"
-    Track-Failure "git clone of $($Resp.repo_url) failed - see install output"
+    Write-Host "  ${RED}✗ Clone failed. Full output: $InstallLog${RESET}"
+    Track-Failure "git clone of $($Resp.repo_url) failed - see $InstallLog"
   }
 }
 
-git -C $WorkspaceDir config user.name $Resp.name
-git -C $WorkspaceDir config user.email $Resp.email
+# Bake credential helper into repo-local config so future ops (push/pull/fetch
+# from inside the workspace) use our PAT regardless of global git state. Local
+# config beats global, so this survives `gh auth setup-git`, GCM reinstalls,
+# and any later changes to ~/.gitconfig.
+if (Test-Path (Join-Path $WorkspaceDir ".git")) {
+  & {
+    $ErrorActionPreference = "Continue"
+    git -C $WorkspaceDir config --local --replace-all credential.helper "" 2>&1 | Out-Null
+    git -C $WorkspaceDir config --local --add credential.helper $HelperPathGit 2>&1 | Out-Null
+  }
+  git -C $WorkspaceDir config user.name $Resp.name
+  git -C $WorkspaceDir config user.email $Resp.email
+}
 
 # Start Menu shortcut
 $StartMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Incubator OS.lnk"
@@ -406,4 +427,18 @@ if ($Failures.Count -gt 0) {
   }
   Write-Host "  ${DIM}─────────────────────────────────────────${RESET}"
   Write-Host ""
+
+  # If we captured a clone log, walk the user through sharing it.
+  if (Test-Path $InstallLog) {
+    Write-Host "  ${BOLD}If git clone failed, send Austin the install log:${RESET}"
+    Write-Host ""
+    Write-Host "    ${BRAND_ACCENT}1.${RESET} Open the log:"
+    Write-Host "       ${DIM}notepad `"$InstallLog`"${RESET}"
+    Write-Host ""
+    Write-Host "    ${BRAND_ACCENT}2.${RESET} Or copy it to your clipboard:"
+    Write-Host "       ${DIM}Get-Content `"$InstallLog`" | Set-Clipboard${RESET}"
+    Write-Host ""
+    Write-Host "    ${BRAND_ACCENT}3.${RESET} Paste the contents to Austin (Slack/email)."
+    Write-Host ""
+  }
 }
