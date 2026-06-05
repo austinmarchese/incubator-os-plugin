@@ -197,6 +197,14 @@ BEHIND=$(git rev-list --count HEAD..origin/main)
 git push origin main
 ```
 
+**If push is denied by a permission rule** (e.g., "Direct push to main"):
+
+- If auto mode is active, tell the user:
+  > "Push got denied by a permission rule. Auto mode is on, so I can't get an interactive approval. Switch off auto mode (shift+tab), then say 'retry' and I'll push again."
+- Then stop and wait. Do not retry the push until the user confirms.
+- If push is denied and auto mode is **not** active, the user already denied it manually. Do not retry. Ask what they want to do instead (e.g., open a PR, keep the commit local).
+- If the denial reason mentions "permission denied" from the remote itself (not a local Claude Code rule), the PAT may have been revoked. Tell the user to contact Austin for a fresh install URL.
+
 ### Step 7: Confirm
 
 ```
@@ -209,6 +217,7 @@ Changes:
 ## Edge cases
 
 - **Push fails (auth, network):** Show the error. Suggest `git push origin main` again after checking credentials.
+- **Push denied by Claude Code permission rule + auto mode on:** See Step 6. Tell the user to turn off auto mode and retry. Do not silently re-attempt.
 - **Rebase aborted by user:** Run `git rebase --abort` to restore the pre-rebase state. Nothing is lost.
 - **Mixed risky + safe:** Only the risky files get interactive review. Safe files flow through automatically.
 - **User wants to override all risk warnings:** That's fine. If they say "just push it" or "skip review", respect that and proceed to Step 4.

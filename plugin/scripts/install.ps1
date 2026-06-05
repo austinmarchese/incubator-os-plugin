@@ -181,15 +181,21 @@ Write-Host ""
 Write-Host "${BRAND_ACCENT}  [2/4]${RESET}${BOLD} Setting up your workspace credentials...${RESET}"
 Write-Host ""
 
-# Partial-state recovery: skip credential fetch if auth.json valid
+# Partial-state recovery: skip credential fetch only if cached token hash
+# matches current install token. Different install URL (e.g. a new client
+# repo) must NOT reuse the previous client's cached creds.
 $AuthFile = Join-Path $IncOsDir "auth.json"
 $TokenFile = Join-Path $IncOsDir "token"
 $SkipFetch = $false
 
+$sha = [System.Security.Cryptography.SHA256]::Create()
+$InstallTokenHash = -join (($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($InstallToken))) | ForEach-Object { $_.ToString("x2") })
+$sha.Dispose()
+
 if ((Test-Path $AuthFile) -and (Test-Path $TokenFile)) {
   try {
     $ExistingAuth = Get-Content $AuthFile -Raw | ConvertFrom-Json
-    if ($ExistingAuth.client_id) {
+    if ($ExistingAuth.client_id -and $ExistingAuth.install_token_hash -eq $InstallTokenHash) {
       $Resp = [PSCustomObject]@{
         name = $ExistingAuth.name
         email = $ExistingAuth.email
@@ -226,6 +232,7 @@ $AuthJson = @{
   client_id = $Resp.client_id
   api_base = $ApiBase
   repo_url = $Resp.repo_url
+  install_token_hash = $InstallTokenHash
 } | ConvertTo-Json -Compress
 
 [System.IO.File]::WriteAllText($AuthFile, $AuthJson, [System.Text.UTF8Encoding]::new($false))

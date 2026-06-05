@@ -151,11 +151,15 @@ echo ""
 echo -e "${BRAND_ACCENT}  [2/4]${RESET}${BOLD} Setting up your workspace credentials...${RESET}"
 echo ""
 
-# ── Partial-state recovery: skip credential fetch if auth.json valid ──
+# ── Partial-state recovery: skip credential fetch if auth.json matches token ──
+# Cache is keyed by sha256(INSTALL_TOKEN). A different install URL (e.g. a new
+# client repo) must NOT reuse the previous client's cached creds.
 SKIP_FETCH=false
+INSTALL_TOKEN_HASH=$(node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex'))" "$INSTALL_TOKEN")
 if [ -f "$INC_OS_DIR/auth.json" ] && [ -f "$INC_OS_DIR/token" ]; then
+  CACHED_HASH=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).install_token_hash||'')}catch{}" "$INC_OS_DIR/auth.json" 2>/dev/null)
   EXISTING_CID=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).client_id||'')}catch{}" "$INC_OS_DIR/auth.json" 2>/dev/null)
-  if [ -n "$EXISTING_CID" ]; then
+  if [ -n "$EXISTING_CID" ] && [ "$CACHED_HASH" = "$INSTALL_TOKEN_HASH" ]; then
     NAME=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).name||'')" "$INC_OS_DIR/auth.json" 2>/dev/null)
     EMAIL=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).email||'')" "$INC_OS_DIR/auth.json" 2>/dev/null)
     AUTH_TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).token||'')" "$INC_OS_DIR/auth.json" 2>/dev/null)
@@ -198,9 +202,9 @@ chmod 700 "$INC_OS_DIR"
 # Build auth.json via node (JSON.stringify guarantees correct escaping)
 node -e '
 const fs = require("fs");
-const [path, tok, em, nm, cid, api, repo] = process.argv.slice(1);
-fs.writeFileSync(path, JSON.stringify({ token: tok, email: em, name: nm, client_id: cid, api_base: api, repo_url: repo }, null, 2) + "\n");
-' "$INC_OS_DIR/auth.json" "$AUTH_TOKEN" "$EMAIL" "$NAME" "$CLIENT_ID" "$API_BASE" "$REPO_URL"
+const [path, tok, em, nm, cid, api, repo, hash] = process.argv.slice(1);
+fs.writeFileSync(path, JSON.stringify({ token: tok, email: em, name: nm, client_id: cid, api_base: api, repo_url: repo, install_token_hash: hash }, null, 2) + "\n");
+' "$INC_OS_DIR/auth.json" "$AUTH_TOKEN" "$EMAIL" "$NAME" "$CLIENT_ID" "$API_BASE" "$REPO_URL" "$INSTALL_TOKEN_HASH"
 chmod 600 "$INC_OS_DIR/auth.json"
 echo -e "  ${GREEN}✓ Wrote ~/.incubator-os/auth.json (chmod 600)${RESET}"
 
