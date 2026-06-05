@@ -196,13 +196,21 @@ if ((Test-Path $AuthFile) -and (Test-Path $TokenFile)) {
   try {
     $ExistingAuth = Get-Content $AuthFile -Raw | ConvertFrom-Json
     if ($ExistingAuth.client_id -and $ExistingAuth.install_token_hash -eq $InstallTokenHash) {
+      # Prefer per-repo PAT; fall back to legacy single-token file.
+      $cachedRepoName = ($ExistingAuth.repo_url -replace '\.git$','').Split('/')[-1]
+      $PerRepoTokenFile = Join-Path $IncOsDir "tokens\$cachedRepoName"
+      if (Test-Path $PerRepoTokenFile) {
+        $cachedPat = Get-Content $PerRepoTokenFile -Raw
+      } else {
+        $cachedPat = Get-Content $TokenFile -Raw
+      }
       $Resp = [PSCustomObject]@{
         name = $ExistingAuth.name
         email = $ExistingAuth.email
         client_id = $ExistingAuth.client_id
         auth_token = $ExistingAuth.token
         repo_url = $ExistingAuth.repo_url
-        pat = Get-Content $TokenFile -Raw
+        pat = $cachedPat
       }
       $SkipFetch = $true
       Write-Host "  ${GREEN}✓ Fetched credentials for $($Resp.name) (cached)${RESET}"
@@ -238,11 +246,19 @@ $AuthJson = @{
 [System.IO.File]::WriteAllText($AuthFile, $AuthJson, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText($TokenFile, $Resp.pat, [System.Text.UTF8Encoding]::new($false))
 
+# Per-org tokens: store PAT keyed by repo basename so the credential helper
+# can return the correct PAT for each workspace.
+$TokensDir = Join-Path $IncOsDir "tokens"
+New-Item -ItemType Directory -Force -Path $TokensDir | Out-Null
+$PerRepoTokenFile = Join-Path $TokensDir $RepoName
+[System.IO.File]::WriteAllText($PerRepoTokenFile, $Resp.pat, [System.Text.UTF8Encoding]::new($false))
+
 # Restrict ACLs to current user only (Windows equivalent of chmod 600)
 icacls $AuthFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 icacls $TokenFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
+icacls $PerRepoTokenFile /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/auth.json (ACL: current user only)${RESET}"
-Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/token (ACL: current user only)${RESET}"
+Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/tokens/$RepoName (ACL: current user only)${RESET}"
 
 # URL-scoped credential helper.
 # Git on Windows runs credential helpers via the bundled msys/MinGW
@@ -253,11 +269,31 @@ Write-Host "  ${GREEN}✓ Wrote ~/.incubator-os/token (ACL: current user only)${
 $HelperPath = Join-Path $IncOsDir "credential-helper.sh"
 # Use $HOME (msys sh resolves it to %USERPROFILE%) to match install.sh exactly.
 # Avoids baked-in Windows paths that msys may interpret inconsistently.
+# Helper parses git's stdin to pick the per-repo token file.
 $helperBody = @"
 #!/bin/sh
+# Returns the PAT for HTTPS auth to github.com/austinmarchese/*.
+# Multi-org: per-repo token files at ~/.incubator-os/tokens/<repo>.
 [ "`$1" = "get" ] || exit 0
-echo "username=austinmarchese"
-echo "password=`$(cat "`$HOME/.incubator-os/token")"
+req_path=""
+while IFS= read -r line; do
+  [ -z "`$line" ] && break
+  case "`$line" in
+    path=*) req_path="`${line#path=}" ;;
+  esac
+done
+repo_name=""
+if [ -n "`$req_path" ]; then
+  repo_name=`$(basename "`${req_path%.git}")
+fi
+TOKEN_FILE="`$HOME/.incubator-os/tokens/`$repo_name"
+if [ -n "`$repo_name" ] && [ -f "`$TOKEN_FILE" ]; then
+  echo "username=austinmarchese"
+  echo "password=`$(cat "`$TOKEN_FILE")"
+elif [ -f "`$HOME/.incubator-os/token" ]; then
+  echo "username=austinmarchese"
+  echo "password=`$(cat "`$HOME/.incubator-os/token")"
+fi
 "@
 $helperBodyLf = $helperBody -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($HelperPath, $helperBodyLf, [System.Text.UTF8Encoding]::new($false))

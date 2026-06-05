@@ -1,6 +1,6 @@
 {
   "name": "inc-os",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Incubator OS — content workspace skills for Claude Code.",
   "homepage": "https://incubator-os.com",
   "repository": "https://github.com/austinmarchese/incubator-os-plugin",

@@ -165,7 +165,13 @@ if [ -f "$INC_OS_DIR/auth.json" ] && [ -f "$INC_OS_DIR/token" ]; then
     AUTH_TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).token||'')" "$INC_OS_DIR/auth.json" 2>/dev/null)
     CLIENT_ID="$EXISTING_CID"
     REPO_URL=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).repo_url||'')" "$INC_OS_DIR/auth.json" 2>/dev/null)
-    PAT=$(cat "$INC_OS_DIR/token")
+    # Prefer per-repo PAT; fall back to legacy single-token file.
+    CACHED_REPO_NAME=$(basename "$REPO_URL" .git)
+    if [ -f "$INC_OS_DIR/tokens/$CACHED_REPO_NAME" ]; then
+      PAT=$(cat "$INC_OS_DIR/tokens/$CACHED_REPO_NAME")
+    else
+      PAT=$(cat "$INC_OS_DIR/token")
+    fi
     SKIP_FETCH=true
     echo -e "  ${GREEN}✓ Fetched credentials for $NAME (cached)${RESET}"
   fi
@@ -208,18 +214,49 @@ fs.writeFileSync(path, JSON.stringify({ token: tok, email: em, name: nm, client_
 chmod 600 "$INC_OS_DIR/auth.json"
 echo -e "  ${GREEN}✓ Wrote ~/.incubator-os/auth.json (chmod 600)${RESET}"
 
+# Per-org tokens: store PAT keyed by repo basename so the credential helper
+# can return the correct PAT for each workspace. A user installed for multiple
+# orgs (e.g. internal-os AND client-foo) has one PAT per org, not a single
+# most-recent-wins file.
+mkdir -p "$INC_OS_DIR/tokens"
+chmod 700 "$INC_OS_DIR/tokens"
+printf '%s' "$PAT" > "$INC_OS_DIR/tokens/$REPO_NAME"
+chmod 600 "$INC_OS_DIR/tokens/$REPO_NAME"
+echo -e "  ${GREEN}✓ Wrote ~/.incubator-os/tokens/$REPO_NAME (chmod 600)${RESET}"
+
+# Legacy single-token file kept for back-compat (older helper scripts may still read it).
 printf '%s' "$PAT" > "$INC_OS_DIR/token"
 chmod 600 "$INC_OS_DIR/token"
-echo -e "  ${GREEN}✓ Wrote ~/.incubator-os/token (chmod 600)${RESET}"
 
 # ── Configure git credential helper (URL-scoped, NOT global) ───────
+# Helper reads git's credential request from stdin, parses `path=` to pick
+# the per-repo token file. Falls back to the legacy single-token file.
 HELPER_SCRIPT="$INC_OS_DIR/credential-helper.sh"
 cat > "$HELPER_SCRIPT" <<'HELPER'
 #!/bin/sh
-# Reads the PAT for HTTPS auth to github.com/austinmarchese/*
+# Returns the PAT for HTTPS auth to github.com/austinmarchese/*.
+# Multi-org: per-repo token files at ~/.incubator-os/tokens/<repo>.
 [ "$1" = "get" ] || exit 0
-echo "username=austinmarchese"
-echo "password=$(cat "$HOME/.incubator-os/token")"
+req_path=""
+while IFS= read -r line; do
+  [ -z "$line" ] && break
+  case "$line" in
+    path=*) req_path="${line#path=}" ;;
+  esac
+done
+repo_name=""
+if [ -n "$req_path" ]; then
+  # path is like "austinmarchese/internal-os.git"; strip .git and dir.
+  repo_name=$(basename "${req_path%.git}")
+fi
+TOKEN_FILE="$HOME/.incubator-os/tokens/$repo_name"
+if [ -n "$repo_name" ] && [ -f "$TOKEN_FILE" ]; then
+  echo "username=austinmarchese"
+  echo "password=$(cat "$TOKEN_FILE")"
+elif [ -f "$HOME/.incubator-os/token" ]; then
+  echo "username=austinmarchese"
+  echo "password=$(cat "$HOME/.incubator-os/token")"
+fi
 HELPER
 chmod +x "$HELPER_SCRIPT"
 
