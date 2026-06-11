@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Curated content workspace skills for Incubator OS clients.",
-    "version": "0.5.4"
+    "version": "0.6.0"
   },
   "plugins": [
     {
       "name": "inc-os",
       "source": "./plugin",
       "description": "Incubator OS — content workspace skills.",
-      "version": "0.5.4",
+      "version": "0.6.0",
       "category": "productivity",
       "tags": [
         "incubator",

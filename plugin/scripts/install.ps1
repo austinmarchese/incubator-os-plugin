@@ -60,18 +60,30 @@ if (-not $InstallToken -or $InstallToken -eq "__INSTALL_TOKEN_PLACEHOLDER__") {
   exit 1
 }
 
-# ── Require winget ─────────────────────────────────────────────────
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-  Write-Host ""
-  Write-Host "  ${RED}winget is not installed.${RESET}"
-  Write-Host ""
-  Write-Host "  ${BOLD}Install 'App Installer' from the Microsoft Store, then rerun this script:${RESET}"
-  Write-Host ""
-  Write-Host "    ${BRAND_ACCENT}https://apps.microsoft.com/detail/9NBLGGH4NNS1${RESET}"
-  Write-Host ""
-  Write-Host "  ${DIM}Docs: https://aka.ms/getwinget${RESET}"
-  Write-Host ""
-  exit 1
+# ── Check winget (optional if required deps already present) ───────
+# winget is the default delivery mechanism on Windows desktop. On Windows
+# Server / locked-down enterprise boxes it's often absent. Fall back to
+# pre-installed git/node when winget is missing; surface MSI links only
+# if a required dep is also absent.
+$HasWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+if (-not $HasWinget) {
+  $MissingDeps = @()
+  if (-not (Get-Command git  -ErrorAction SilentlyContinue)) { $MissingDeps += "Git (https://git-scm.com/download/win)" }
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { $MissingDeps += "Node.js LTS (https://nodejs.org/en/download)" }
+  if ($MissingDeps.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  ${RED}winget is not installed, and required dependencies are missing:${RESET}"
+    Write-Host ""
+    foreach ($d in $MissingDeps) { Write-Host "    ${RED}• $d${RESET}" }
+    Write-Host ""
+    Write-Host "  ${BOLD}Install the dependencies above (MSI), then rerun this script.${RESET}"
+    Write-Host ""
+    Write-Host "  ${DIM}Or install winget via 'App Installer': https://apps.microsoft.com/detail/9NBLGGH4NNS1${RESET}"
+    Write-Host "  ${DIM}Docs: https://aka.ms/getwinget${RESET}"
+    Write-Host ""
+    exit 1
+  }
+  Write-Host "  ${YELLOW}! winget not available — using existing dependencies, skipping optional installs${RESET}"
 }
 
 # ── [1/4] Dependencies ─────────────────────────────────────────────
@@ -83,28 +95,38 @@ Write-Host ""
 Refresh-Path
 
 function Ensure-Cmd {
-  param([string]$Cmd, [string]$WingetId, [string]$Label)
+  param([string]$Cmd, [string]$WingetId, [string]$Label, [string]$ManualUrl)
   if (-not (Get-Command $Cmd -ErrorAction SilentlyContinue)) {
-    winget install --id $WingetId --accept-source-agreements --accept-package-agreements --silent | Out-Null
-    Refresh-Path
-    Write-Host "  ${GREEN}✓ $Label (installed)${RESET}"
+    if ($HasWinget) {
+      winget install --id $WingetId --accept-source-agreements --accept-package-agreements --silent | Out-Null
+      Refresh-Path
+      Write-Host "  ${GREEN}✓ $Label (installed)${RESET}"
+    } else {
+      Write-Host "  ${RED}✗ $Label not installed and winget unavailable — install manually: $ManualUrl${RESET}"
+      Track-Failure "$Label not installed (winget unavailable, manual install: $ManualUrl)"
+    }
   } else {
     Write-Host "  ${GREEN}✓ $Label (already installed)${RESET}"
   }
 }
 
-Ensure-Cmd git "Git.Git" "git"
-Ensure-Cmd node "OpenJS.NodeJS.LTS" "node"
+Ensure-Cmd git "Git.Git" "git" "https://git-scm.com/download/win"
+Ensure-Cmd node "OpenJS.NodeJS.LTS" "node" "https://nodejs.org/en/download"
 
 # ── Ingest dependencies (best-effort; non-fatal) ───────────────────
 # yt-dlp: used by scripts/fetch_youtube_transcript.py for title/channel metadata
 if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
-  try {
-    winget install --id yt-dlp.yt-dlp --accept-source-agreements --accept-package-agreements --silent | Out-Null
-    Write-Host "  ${GREEN}✓ yt-dlp (installed)${RESET}"
-  } catch {
-    Write-Host "  ${YELLOW}! yt-dlp not available — YouTube transcript metadata will fall back to video ID only${RESET}"
-    Track-Failure "yt-dlp (optional, YouTube ingest)"
+  if ($HasWinget) {
+    try {
+      winget install --id yt-dlp.yt-dlp --accept-source-agreements --accept-package-agreements --silent | Out-Null
+      Write-Host "  ${GREEN}✓ yt-dlp (installed)${RESET}"
+    } catch {
+      Write-Host "  ${YELLOW}! yt-dlp not available — YouTube transcript metadata will fall back to video ID only${RESET}"
+      Track-Failure "yt-dlp (optional, YouTube ingest)"
+    }
+  } else {
+    Write-Host "  ${YELLOW}! yt-dlp skipped (winget unavailable) — YouTube transcript metadata will fall back to video ID only${RESET}"
+    Track-Failure "yt-dlp (optional, YouTube ingest - winget unavailable)"
   }
 } else {
   Write-Host "  ${GREEN}✓ yt-dlp (already installed)${RESET}"
@@ -165,7 +187,7 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
 $ClaudeDesktopPath = Join-Path $env:LOCALAPPDATA "AnthropicClaude\claude.exe"
 if (Test-Path $ClaudeDesktopPath) {
   Write-Host "  ${GREEN}✓ Claude Desktop (already installed)${RESET}"
-} else {
+} elseif ($HasWinget) {
   try {
     winget install --id Anthropic.Claude --accept-source-agreements --accept-package-agreements --silent | Out-Null
     Write-Host "  ${GREEN}✓ Claude Desktop (installed)${RESET}"
@@ -173,6 +195,9 @@ if (Test-Path $ClaudeDesktopPath) {
     Write-Host "  ${YELLOW}! Claude Desktop install skipped — install manually from https://claude.ai/download${RESET}"
     Track-Failure "Claude Desktop (manual install needed: https://claude.ai/download)"
   }
+} else {
+  Write-Host "  ${YELLOW}! Claude Desktop install skipped (winget unavailable) — install manually from https://claude.ai/download${RESET}"
+  Track-Failure "Claude Desktop (manual install needed: https://claude.ai/download)"
 }
 
 Write-Host ""
